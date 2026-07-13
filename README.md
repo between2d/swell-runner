@@ -1,18 +1,33 @@
 # Swell Runner: João Pessoa
 
-A compact arcade surfing game built with Three.js and Vite, set along a deliberately stylized João Pessoa shoreline. Procedural scenery includes a beachfront skyline, palms, kiosks, a circular Hotel Tambaú-inspired silhouette, Cabo Branco red cliffs and lighthouse, floating garbage, sewage slicks, foam, sky, and synthesized audio. No external art assets are required.
+A cartoon Three.js surfing game about collecting ocean garbage and avoiding sewage along a fictionalized João Pessoa coast.
 
-## Play
+## Current game loop
 
-- **A / D** or **Left / Right**: carve
-- **W / S** or **Up / Down**: speed up or slow down
-- **Space**: jump
-- **Left / Right while airborne**: spin
-- **Shift**: spend Flow for a speed boost
-- **P / Escape**: pause
-- Touchscreen controls are included
+- Surf timed 35-second rounds.
+- Collect bottles, cans, bags, tyres and Styrofoam for points, Flow and ECO bonuses.
+- Avoid rocks, buoys and sewage slicks.
+- After each round, choose one of three permanent absurd upgrades.
+- Stack upgrades across the run: cleanup seagulls, trash magnets, giant boards, coconut cannons, shields and other nonsense.
+- Read a short local pollution-awareness fact between rounds.
 
-Chain clean carves, collect sun rings, land full spins, and avoid rocks and buoys. Floating trash and sewage slicks break combos, drain Flow, subtract points, and slow the surfer. A failed landing or hard collision costs a life.
+The game is educational fiction, not a live balneability map. Players should use official beach-quality reports when deciding whether to swim.
+
+## Controls
+
+### Desktop
+
+- **A / D** or **Left / Right:** carve
+- **W / S** or **Up / Down:** speed
+- **Space:** jump and spin
+- **Shift:** Flow boost
+- **P / Escape:** pause
+
+### Mobile
+
+- Drag the left thumb pad to steer and control speed.
+- Tap **JUMP** to jump.
+- Hold **FLOW** to boost.
 
 ## Run locally
 
@@ -21,28 +36,17 @@ npm install
 npm run dev
 ```
 
-Open the local URL printed by Vite.
-
-## Production build
+## Build
 
 ```bash
 npm run build
-npm run preview
 ```
 
-The optimized site is written to `dist/`.
-
-## GitHub Pages
-
-The included workflow in `.github/workflows/deploy.yml` builds and deploys the game on every push to `main`. In the repository settings, set **Pages → Source** to **GitHub Actions** if GitHub does not select it automatically.
+GitHub Pages deploys automatically from `main` through `.github/workflows/deploy.yml`.
 
 ## Tech
 
-- Three.js
-- GLSL vertex and fragment shaders
-- Vite
-- Web Audio API
-- Keyboard and touch input
+Three.js, GLSL, Vite, Web Audio API, touch, keyboard and gamepad input.
 
 ## License
 
