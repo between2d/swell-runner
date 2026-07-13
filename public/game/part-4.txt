@@ -1,0 +1,372 @@
+line(foam, 1.06, 0.7);
+      group.add(foam);
+      addCartoonEyes(group, [0, 0.25, 0.42], 0.95);
+    }
+
+    group.position.set(x, waveHeight(x, z, this.time) + 0.42, z);
+    group.rotation.y = rand(-0.35, 0.35);
+    group.traverse((child) => { if (child.isMesh) child.castShadow = true; });
+    this.scene.add(group);
+    this.pollution.push({
+      mesh: group,
+      kind: 'trash',
+      trashKind: kind,
+      radius: kind === 'tire' ? 1.05 : 0.78,
+      phase: rand(0, TAU),
+      hit: false,
+      value: { bottle: 110, can: 95, bag: 130, tire: 190, foam: 85 }[kind],
+    });
+  }
+
+  createSewagePatch(x, z, radius = rand(3.4, 5.7)) {
+    const group = new THREE.Group();
+    const stain = new THREE.Mesh(
+      new THREE.CircleGeometry(radius, 40),
+      new THREE.MeshBasicMaterial({ map: this.sewageTexture, transparent: true, depthWrite: false, opacity: 0.88, side: THREE.DoubleSide }),
+    );
+    stain.rotation.x = -Math.PI / 2;
+    group.add(stain);
+
+    const bubbleMaterial = new THREE.MeshStandardMaterial({ color: 0x8f9250, emissive: 0x303411, emissiveIntensity: 0.25, roughness: 0.6 });
+    for (let i = 0; i < 10; i += 1) {
+      const bubble = new THREE.Mesh(new THREE.SphereGeometry(rand(0.07, 0.18), 8, 6), bubbleMaterial);
+      const angle = rand(0, TAU);
+      const distance = Math.sqrt(Math.random()) * radius * 0.72;
+      bubble.position.set(Math.cos(angle) * distance, rand(0.07, 0.3), Math.sin(angle) * distance);
+      bubble.userData.offset = rand(0, TAU);
+      group.add(bubble);
+    }
+
+    group.position.set(x, waveHeight(x, z, this.time) + 0.08, z);
+    group.rotation.y = rand(0, TAU);
+    this.scene.add(group);
+    this.pollution.push({ mesh: group, kind: 'sewage', radius, phase: rand(0, TAU), hit: false });
+  }
+
+  pollutionHit(item) {
+    if (item.hit || this.player.invulnerable > 0) return;
+    item.hit = true;
+
+    if (this.player.shield > 0) {
+      this.player.shield -= 1;
+      this.showCallout('BOLHA: NOJENTO, MAS SEGURO');
+      this.audio.tone(560, 0.16, 'sine', 0.09, 330);
+      this.createBurst(item.mesh.position, [0x67f7ff, 0xffffff, 0xffef64], 12);
+      this.squash = 0.18;
+      this.updatePowerupChips();
+      return;
+    }
+
+    this.player.combo = 0;
+    this.player.multiplier = 1;
+    this.comboTimer = 0;
+    this.roundSewageHits += 1;
+    this.player.flow = Math.max(0, this.player.flow - 30);
+    this.player.speed *= 0.69;
+    this.player.score = Math.max(0, this.player.score - 140);
+    this.showCallout('ESGOTO! -FLOW');
+    this.audio.tone(92, 0.42, 'sawtooth', 0.13, -38);
+    this.cameraShake = Math.max(this.cameraShake, 0.32);
+    this.squash = -0.28;
+
+    dom.flash.classList.remove('polluted');
+    void dom.flash.offsetWidth;
+    dom.flash.classList.add('polluted');
+  }
+
+  collectTrash(item, index, source = 'SURF') {
+    const position = item.mesh.position.clone();
+    this.scene.remove(item.mesh);
+    this.pollution.splice(index, 1);
+
+    const temporaryMultiplier = this.temp.double > 0 ? 2 : 1;
+    const points = Math.floor(item.value * this.mods.trashScore * temporaryMultiplier * this.player.multiplier);
+    this.player.score += points;
+    this.player.cleaned += 1;
+    this.roundCleaned += 1;
+    this.player.flow = clamp(this.player.flow + 7 * this.mods.flowGain, 0, 100);
+    this.player.combo += 1;
+    this.comboTimer = Math.max(this.comboTimer, 3.2);
+    this.cleanupCharge += 1;
+    this.squash = Math.max(this.squash, 0.2);
+    this.cameraShake = Math.max(this.cameraShake, 0.06);
+
+    const label = {
+      bottle: 'GARRAFA FORA', can: 'LATA CATADA', bag: 'SACOLA RESGATADA', tire: 'PNEU PESCADO', foam: 'ISOPOR FORA',
+    }[item.trashKind] || 'LIXO RECOLHIDO';
+    if (this.player.cleaned < 5 || this.player.cleaned % 3 === 0 || source === 'GULL') {
+      this.showCallout(`${source === 'GULL' ? 'GAIVOTA: ' : ''}${label} +${points}`);
+    }
+    this.createBurst(position, [0x75f0a1, 0xffef64, 0x67f7ff, 0xff6bb5], item.trashKind === 'tire' ? 16 : 10);
+    this.audio.tone(source === 'GULL' ? 1040 : 820, 0.08, 'square', 0.055, 240);
+    navigator.vibrate?.(source === 'GULL' ? 5 : 10);
+
+    dom.flash.classList.remove('cleaned');
+    void dom.flash.offsetWidth;
+    dom.flash.classList.add('cleaned');
+
+    if (this.cleanupCharge >= this.mods.cleanupThreshold) {
+      this.cleanupCharge -= this.mods.cleanupThreshold;
+      this.grantCleanupReward();
+    }
+  }
+
+  grantCleanupReward() {
+    const reward = CLEANUP_REWARDS[Math.floor(Math.random() * CLEANUP_REWARDS.length)];
+    if (reward.id === 'double') this.temp.double = Math.max(this.temp.double, 9);
+    if (reward.id === 'magnet') this.temp.magnet = Math.max(this.temp.magnet, 10);
+    if (reward.id === 'flow') this.player.flow = 100;
+    if (reward.id === 'shield') this.player.shield += 1;
+    if (reward.id === 'turbo') this.temp.turbo = Math.max(this.temp.turbo, 8);
+    this.showCallout(`ECO BONUS: ${reward.label}`);
+    this.audio.tone(520, 0.12, 'triangle', 0.08, 700);
+    this.updatePowerupChips();
+  }
+
+  createBurst(position, colors = [0xffffff], count = 10) {
+    const group = new THREE.Group();
+    group.position.copy(position);
+    const particles = [];
+    for (let i = 0; i < count; i += 1) {
+      const color = colors[i % colors.length];
+      const mesh = new THREE.Mesh(new THREE.IcosahedronGeometry(rand(0.045, 0.13), 0), new THREE.MeshBasicMaterial({ color }));
+      const velocity = new THREE.Vector3(rand(-2.8, 2.8), rand(1.2, 4.2), rand(-2.4, 2.4));
+      group.add(mesh);
+      particles.push({ mesh, velocity, spin: rand(-8, 8) });
+    }
+    this.scene.add(group);
+    this.effects.push({ group, particles, life: 0.78 });
+  }
+
+  updateEffects(dt) {
+    for (let i = this.effects.length - 1; i >= 0; i -= 1) {
+      const effect = this.effects[i];
+      effect.life -= dt;
+      for (const particle of effect.particles) {
+        particle.velocity.y -= 7.5 * dt;
+        particle.mesh.position.addScaledVector(particle.velocity, dt);
+        particle.mesh.rotation.x += particle.spin * dt;
+        particle.mesh.rotation.y += particle.spin * 0.7 * dt;
+        particle.mesh.scale.setScalar(clamp(effect.life * 1.7, 0.05, 1));
+      }
+      if (effect.life <= 0) {
+        this.scene.remove(effect.group);
+        this.effects.splice(i, 1);
+      }
+    }
+  }
+
+  fireCoconut() {
+    const group = new THREE.Group();
+    const coconut = new THREE.Mesh(new THREE.SphereGeometry(0.34, 10, 7), toonMaterial(0x76502e));
+    coconut.scale.set(1, 0.9, 1.08);
+    addOutline(coconut, 1.07, 0.72);
+    const stripe = new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.025, 5, 12), toonMaterial(0xb98b56));
+    stripe.rotation.x = Math.PI / 2;
+    group.add(coconut, stripe);
+    group.position.copy(this.surfer.position);
+    group.position.z -= 1.4;
+    this.scene.add(group);
+    this.projectiles.push({ mesh: group, speed: 42 + this.mods.coconut * 4 });
+    this.audio.tone(150, 0.1, 'square', 0.05, -50);
+  }
+
+  updateProjectiles(dt) {
+    if (this.mods.coconut > 0) {
+      this.coconutTimer -= dt;
+      if (this.coconutTimer <= 0) {
+        this.fireCoconut();
+        this.coconutTimer = Math.max(2.7, 7.2 - this.mods.coconut * 0.85);
+      }
+    }
+
+    for (let i = this.projectiles.length - 1; i >= 0; i -= 1) {
+      const projectile = this.projectiles[i];
+      projectile.mesh.position.z -= projectile.speed * dt;
+      projectile.mesh.rotation.x += dt * 8;
+      projectile.mesh.rotation.z += dt * 5;
+      let destroyed = false;
+      for (let j = this.obstacles.length - 1; j >= 0; j -= 1) {
+        const obstacle = this.obstacles[j];
+        const dx = obstacle.mesh.position.x - projectile.mesh.position.x;
+        const dz = obstacle.mesh.position.z - projectile.mesh.position.z;
+        if (dx * dx + dz * dz < (obstacle.radius + 0.5) ** 2) {
+          const hitPosition = obstacle.mesh.position.clone();
+          this.scene.remove(obstacle.mesh);
+          this.obstacles.splice(j, 1);
+          this.player.score += 90 * this.player.multiplier;
+          this.createBurst(hitPosition, [0x8b5d32, 0xffef64, 0xffffff], 13);
+          this.audio.tone(110, 0.16, 'sawtooth', 0.07, 180);
+          destroyed = true;
+          break;
+        }
+      }
+      if (destroyed || projectile.mesh.position.z < -150) {
+        this.scene.remove(projectile.mesh);
+        this.projectiles.splice(i, 1);
+      }
+    }
+  }
+
+  updateHelpers(dt) {
+    const count = this.seagulls.length;
+    for (let i = 0; i < count; i += 1) {
+      const gull = this.seagulls[i];
+      const phase = gull.userData.phase + this.time * (1.25 + this.mods.gulls * 0.05);
+      const radius = 2.3 + i * 0.3;
+      gull.position.set(
+        this.surfer.position.x + Math.cos(phase) * radius,
+        this.surfer.position.y + 2.1 + Math.sin(phase * 1.7) * 0.55,
+        this.playerZ + Math.sin(phase) * 1.6,
+      );
+      gull.rotation.y = -phase + Math.PI / 2;
+      const flap = Math.sin(this.time * 13 + i) * 0.7;
+      gull.userData.leftWing.rotation.z = Math.PI / 2 + flap;
+      gull.userData.rightWing.rotation.z = -Math.PI / 2 - flap;
+    }
+  }
+
+  spawnPattern() {
+    const z = -118;
+    const difficulty = clamp(0.82 + (this.round - 1) * 0.085, 0.82, 1.65);
+    const hazardLane = rand(-27, 27);
+
+    // Garbage is now the target, not a punishment. Patterns leave a risky cleanup route.
+    const trashCount = Math.floor(rand(2.2, 4.8 + Math.min(this.round, 6) * 0.18));
+    const trashCenter = rand(-27, 27);
+    for (let i = 0; i < trashCount; i += 1) {
+      const arc = Math.sin(i * 0.85) * rand(1.2, 3.3);
+      this.createTrash(clamp(trashCenter + arc + rand(-1, 1), -30, 30), z - i * rand(3.4, 5.2));
+    }
+
+    if (Math.random() < 0.63 * difficulty) {
+      if (Math.random() < 0.58) this.createRock(hazardLane, z - rand(2, 9));
+      else this.createBuoy(hazardLane, z - rand(2, 9));
+    }
+
+    if (Math.random() < clamp(0.16 + this.round * 0.025, 0.16, 0.42)) {
+      const sewageX = clamp(hazardLane + (Math.random() > 0.5 ? 7 : -7), -24, 24);
+      this.createSewagePatch(sewageX, z - rand(12, 27), rand(3.4, 5.6));
+    }
+
+    if (Math.random() < 0.54) {
+      const safeSide = hazardLane > 0 ? -1 : 1;
+      const pickupX = clamp(hazardLane + safeSide * rand(5.5, 9), -29, 29);
+      const count = Math.floor(rand(1, 4));
+      for (let i = 0; i < count; i += 1) this.createPickup(pickupX + Math.sin(i * 0.8) * 1.2, z - 5 - i * 4.6);
+    }
+  }
+
+  updatePlayer(dt) {
+    const p = this.player;
+    const horizontal = (this.input.held('right') ? 1 : 0) - (this.input.held('left') ? 1 : 0);
+    const throttle = (this.input.held('up') ? 1 : 0) - (this.input.held('down') ? 1 : 0);
+    const turbo = this.temp.turbo > 0;
+    const baseTarget = clamp(19 + p.distance * 0.0024 + throttle * 7.5, 13, 34) * this.mods.speed + (turbo ? 5.5 : 0);
+    const boosting = this.input.held('boost') && p.flow > 0.5;
+    const targetSpeed = baseTarget + (boosting ? 12 : 0);
+
+    p.speed = lerp(p.speed, targetSpeed, 1 - Math.exp(-dt * 1.8));
+    if (boosting) {
+      p.flow = Math.max(0, p.flow - 27 * this.mods.boostDrain * dt);
+      p.score += 8 * dt * p.multiplier;
+    }
+
+    p.vx += horizontal * 31 * this.mods.steer * dt;
+    p.vx *= Math.exp(-dt * (p.grounded ? 3.4 : 1.5));
+    p.vx = clamp(p.vx, -12.5 * this.mods.steer, 12.5 * this.mods.steer);
+    p.x += p.vx * dt;
+    if (Math.abs(p.x) > 31.5) {
+      p.x = clamp(p.x, -31.5, 31.5);
+      p.vx *= -0.34;
+      this.squash = -0.12;
+    }
+
+    if (p.grounded && this.input.pressed('jump')) {
+      p.grounded = false;
+      p.vy = (8.9 + clamp(p.speed - 18, 0, 14) * 0.055) * this.mods.jump;
+      p.jumpY = 0.08;
+      p.airSpin = 0;
+      p.spinDirection = horizontal || Math.sign(p.vx) || 1;
+      this.squash = 0.24;
+      this.audio.tone(240, 0.18, 'triangle', 0.12, 280);
+    }
+
+    if (!p.grounded) {
+      p.vy -= 18.5 * dt;
+      p.jumpY += p.vy * dt;
+      if (horizontal) {
+        p.airSpin += horizontal * dt * 5.45 * this.mods.spin;
+        p.spinDirection = horizontal;
+      }
+
+      if (p.jumpY <= 0 && p.vy < 0) {
+        p.jumpY = 0;
+        const normalized = Math.atan2(Math.sin(p.airSpin), Math.cos(p.airSpin));
+        const rotations = Math.floor(Math.abs(p.airSpin) / TAU + 0.18);
+        p.grounded = true;
+        p.vy = 0;
+        this.squash = 0.34;
+        this.cameraShake = Math.max(this.cameraShake, 0.13);
+        if (Math.abs(normalized) < 0.58) {
+          if (rotations > 0) {
+            const trickScore = rotations * rotations * 260;
+            p.score += trickScore * p.multiplier;
+            p.combo += rotations * 2;
+            p.flow = clamp(p.flow + rotations * 24, 0, 100);
+            this.comboTimer = 4;
+            this.showCallout(`${rotations * 360}° CLEAN +${trickScore}`);
+            this.audio.tone(640, 0.16, 'square', 0.08, 420);
+          } else {
+            p.score += 40 * p.multiplier;
+          }
+          p.airSpin = 0;
+        } else {
+          p.airSpin = 0;
+          this.wipeout('BAD LANDING');
+        }
+      }
+    }
+
+    if (p.grounded && Math.abs(horizontal) > 0 && Math.abs(p.vx) > 2.2) {
+      const carve = Math.abs(p.vx) / (12.5 * this.mods.steer);
+      p.score += carve * p.speed * 0.62 * dt * p.multiplier;
+      p.flow = clamp(p.flow + carve * 4.8 * dt, 0, 100);
+      this.comboTimer = Math.max(this.comboTimer, 2.4);
+      const turn = Math.sign(horizontal);
+      if (turn !== this.lastTurn && this.lastTurn !== 0 && Math.abs(p.vx) > 4.4) {
+        p.combo += 1;
+        p.score += 35 * p.multiplier;
+        this.squash = 0.12;
+        if (p.combo % 4 === 0) this.showCallout(`CARVE CHAIN x${Math.floor(p.combo)}`);
+      }
+      this.lastTurn = turn;
+    } else if (horizontal === 0 && Math.abs(p.vx) < 1.2) {
+      this.lastTurn = 0;
+    }
+
+    p.multiplier = clamp(1 + Math.floor(p.combo / 4) * 0.25, 1, 4);
+    this.comboTimer -= dt;
+    if (this.comboTimer <= 0 && p.combo > 0) {
+      p.combo = Math.max(0, p.combo - dt * 2.5);
+      p.multiplier = clamp(1 + Math.floor(p.combo / 4) * 0.25, 1, 4);
+    }
+
+    p.distance += p.speed * dt * 0.58;
+    p.score += p.speed * (turbo ? 0.32 : 0.2) * dt;
+    p.invulnerable = Math.max(0, p.invulnerable - dt);
+
+    const surface = waveHeight(p.x, this.playerZ, this.time);
+    const epsilon = 0.35;
+    const slopeX = (waveHeight(p.x + epsilon, this.playerZ, this.time) - waveHeight(p.x - epsilon, this.playerZ, this.time)) / (epsilon * 2);
+    const slopeZ = (waveHeight(p.x, this.playerZ + epsilon, this.time) - waveHeight(p.x, this.playerZ - epsilon, this.time)) / (epsilon * 2);
+
+    this.surfer.position.set(p.x, surface + 0.42 + p.jumpY, this.playerZ);
+    const groundedYaw = Math.sin(this.time * 1.4) * 0.035 + p.vx * -0.016;
+    this.surfer.rotation.y = p.grounded ? groundedYaw : p.airSpin;
+    this.surfer.rotation.x = lerp(this.surfer.rotation.x, p.grounded ? slopeZ * 0.42 : -p.vy * 0.038, 1 - Math.exp(-dt * 7));
+    this.surfer.rotation.z = lerp(this.surfer.rotation.z, p.grounded ? -slopeX * 0.45 - p.vx * 0.058 : p.spinDirection * 0.13, 1 - Math.exp(-dt * 7));
+
+    const speedWobble = Math.sin(this.time * (6.5 + p.speed * 0.08));
+    const crouch = p.grounded ? clamp(Math.abs(p.vx) * 0.03 + (boosting ? 0.22 : 0), 0, 0.46) : -0.08;
+    this.body.position.y = lerp(this.body.position.y, 1.55 - crouch + speedWobble * 0.035, 1 - Math.exp(-dt * 9));
