@@ -4,7 +4,12 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#061629" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="description" content="Swell Runner: João Pessoa, a procedural arcade surfing game built with Three.js." />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" href="./icon.svg" type="image/svg+xml" />
     <title>Swell Runner: João Pessoa</title>
   </head>
   <body>
@@ -27,7 +32,11 @@
 
         <section class="hud-card right-stats">
           <div id="lives" class="lives" aria-label="Lives">● ● ●</div>
-          <button id="sound-button" class="icon-button" type="button" aria-label="Toggle sound">SOUND ON</button>
+          <div class="hud-actions">
+            <button id="pause-button" class="icon-button mobile-only" type="button" aria-label="Pause game">Ⅱ</button>
+            <button id="fullscreen-button" class="icon-button" type="button" aria-label="Toggle fullscreen">FULL</button>
+            <button id="sound-button" class="icon-button" type="button" aria-label="Toggle sound">SOUND ON</button>
+          </div>
         </section>
       </div>
 
@@ -40,13 +49,17 @@
           <h1>SWELL<br /><span>RUNNER JP</span></h1>
           <p class="tagline">Carve past Cabo Branco, dodge trash, clear sewage slicks, and survive the beautiful mess offshore.</p>
           <button id="start-button" class="primary-button" type="button">DROP IN</button>
-          <div class="controls-grid">
+          <div class="controls-grid desktop-controls-copy">
             <div><kbd>A</kbd><kbd>D</kbd><span>or arrows to carve</span></div>
             <div><kbd>W</kbd><kbd>S</kbd><span>control speed</span></div>
             <div><kbd>SPACE</kbd><span>jump, then spin</span></div>
             <div><kbd>SHIFT</kbd><span>spend flow to boost</span></div>
           </div>
-          <p class="tiny">P or Esc pauses. Touch controls are included.</p>
+          <div class="mobile-controls-copy">
+            <span><b>DRAG</b> the left pad to carve and control speed.</span>
+            <span><b>JUMP</b> over hazards. Hold <b>FLOW</b> for boost.</span>
+          </div>
+          <p class="tiny">Portrait and landscape both work. Landscape gives you a wider line through the garbage.</p>
         </div>
       </section>
 
@@ -68,14 +81,15 @@
         </div>
       </section>
 
-      <div id="touch-controls" class="touch-controls" aria-label="Touch controls">
-        <div class="touch-cluster">
-          <button type="button" data-action="left" aria-label="Carve left">◀</button>
-          <button type="button" data-action="right" aria-label="Carve right">▶</button>
+      <div id="touch-controls" class="touch-controls" aria-label="Mobile game controls">
+        <div id="stick-zone" class="stick-zone" role="application" aria-label="Drag to steer. Drag up to accelerate and down to slow.">
+          <div class="stick-rings"></div>
+          <div id="stick-knob" class="stick-knob"></div>
+          <span class="stick-caption">CARVE • SPEED</span>
         </div>
-        <div class="touch-cluster">
-          <button type="button" data-action="boost" aria-label="Boost">BOOST</button>
-          <button type="button" data-action="jump" aria-label="Jump">JUMP</button>
+        <div class="action-cluster">
+          <button class="action-button flow-button" type="button" data-action="boost" aria-label="Hold to boost">FLOW</button>
+          <button class="action-button jump-button" type="button" data-action="jump" aria-label="Jump">JUMP</button>
         </div>
       </div>
     </main>
