@@ -43,6 +43,7 @@ import {
 } from 'three';
 import './style.css';
 import './mobile.css';
+import './esgotei.css';
 import './mobile.js';
 
 const THREE = {
@@ -88,7 +89,7 @@ const THREE = {
   Vector3,
   WebGLRenderer,
 };
-const chunkCount = 5;
+const chunkCount = 6;
 const loading = document.createElement('div');
 loading.className = 'runtime-loading';
 loading.textContent = 'LOADING THE DIRTY OCEAN…';
