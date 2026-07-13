@@ -1,5 +1,3 @@
-import './mobile.css';
-
 const $ = (id) => document.getElementById(id);
 const body = document.body;
 const stick = $('stick-zone');
@@ -42,7 +40,6 @@ function releaseDirections() {
 
 if (stick && knob) {
   let pointerId = null;
-
   const moveStick = (event) => {
     if (pointerId !== event.pointerId) return;
     event.preventDefault();
@@ -54,17 +51,15 @@ if (stick && knob) {
     const scale = Math.min(1, radius / distance);
     x *= scale;
     y *= scale;
-    knob.style.transform = `translate3d(${x}px,${y}px,0)`;
+    knob.style.transform = `translate3d(${x}px,${y}px,0) rotate(${x * .08}deg)`;
     stick.classList.add('active');
     setDirection(x / radius, y / radius);
   };
-
   const stopStick = (event) => {
     if (pointerId !== event.pointerId) return;
     pointerId = null;
     releaseDirections();
   };
-
   stick.addEventListener('pointerdown', (event) => {
     if (event.pointerType === 'mouse' && event.button !== 0) return;
     pointerId = event.pointerId;
@@ -88,14 +83,12 @@ function tapKey(code) {
 }
 
 pauseButton?.addEventListener('click', () => tapKey('KeyP'));
-
 fullscreenButton?.addEventListener('click', async () => {
   try {
     if (!document.fullscreenElement) await document.documentElement.requestFullscreen?.();
     else await document.exitFullscreen?.();
   } catch {}
 });
-
 document.addEventListener('fullscreenchange', () => {
   if (fullscreenButton) fullscreenButton.textContent = document.fullscreenElement ? 'EXIT' : 'FULL';
 });
@@ -110,10 +103,7 @@ async function keepAwake() {
   } catch {}
 }
 
-$('start-button')?.addEventListener('click', keepAwake);
-$('restart-button')?.addEventListener('click', keepAwake);
-$('resume-button')?.addEventListener('click', keepAwake);
-
+['start-button', 'restart-button', 'resume-button'].forEach((id) => $(id)?.addEventListener('click', keepAwake));
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) releaseDirections();
   else if (body.classList.contains('playing')) keepAwake();
@@ -124,12 +114,14 @@ function syncGameState() {
   const menuOpen = $('menu')?.classList.contains('active');
   const gameOver = $('gameover-screen')?.classList.contains('active');
   const paused = $('pause-screen')?.classList.contains('active');
+  const choosing = $('upgrade-screen')?.classList.contains('active');
   body.classList.toggle('playing', Boolean(hudVisible && !menuOpen && !gameOver));
   body.classList.toggle('paused', Boolean(paused));
-  if (!hudVisible || menuOpen || gameOver || paused) releaseDirections();
+  body.classList.toggle('choosing', Boolean(choosing));
+  if (!hudVisible || menuOpen || gameOver || paused || choosing) releaseDirections();
 }
 
-['hud', 'menu', 'pause-screen', 'gameover-screen'].forEach((id) => {
+['hud', 'menu', 'pause-screen', 'gameover-screen', 'upgrade-screen'].forEach((id) => {
   const element = $(id);
   if (element) new MutationObserver(syncGameState).observe(element, { attributes: true, attributeFilter: ['class'] });
 });
