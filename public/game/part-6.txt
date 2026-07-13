@@ -1,0 +1,281 @@
+
+// Movimento Esgotei-inspired awareness layer.
+// This project is independent and does not imply an official partnership.
+const ESGOTEI_PROFILE_URL = 'https://www.instagram.com/movimentoesgotei/';
+const ESGOTEI_FACTS = [
+  'EU ESGOTEI. NÓS ESGOTAMOS. O nome aponta tanto para o esgoto irregular quanto para o limite da paciência com a degradação ambiental.',
+  'O Movimento Esgotei nasceu na Paraíba como mobilização popular por saneamento, rios urbanos e praias sem esgoto.',
+  'DENÚNCIA + AÇÃO AMBIENTAL: registrar um ponto é só o começo. Informação precisa virar cobrança pública, participação e acompanhamento.',
+  'TRANSFORME INDIGNAÇÃO EM ATITUDE. Recolher lixo ajuda, mas saneamento básico e fiscalização exigem ação coletiva e poder público funcionando.',
+  'ESGOTOS NO MAR: CATÁSTROFE AMBIENTAL. A contaminação afeta ecossistemas, trabalho, lazer e saúde pública.',
+  'RIOS SEM ESGOTO. Praias saudáveis dependem também do que acontece em canais, galerias, maceiós e rios antes de a água chegar ao mar.',
+];
+LOCAL_FACTS.splice(0, 0, ...ESGOTEI_FACTS);
+
+const reportPrompt = document.createElement('div');
+reportPrompt.id = 'report-prompt';
+reportPrompt.className = 'report-prompt';
+reportPrompt.innerHTML = '<span class="report-siren">!</span><strong>DENUNCIE O PONTO</strong><small><kbd>E</kbd> ou botão DENÚNCIA</small>';
+document.querySelector('#game-root').append(reportPrompt);
+
+dom.reportPrompt = reportPrompt;
+
+const statsPanel = document.querySelector('.stats');
+if (statsPanel && !document.querySelector('#reported')) {
+  const label = document.createElement('span');
+  label.className = 'hud-label report-row';
+  label.textContent = 'DENÚNCIAS';
+  const value = document.createElement('strong');
+  value.className = 'report-row';
+  value.innerHTML = '<span id="reported">0</span>';
+  statsPanel.append(label, value);
+  dom.reported = value.querySelector('#reported');
+}
+
+const actionCluster = document.querySelector('.action-cluster');
+if (actionCluster && !document.querySelector('[data-action="report"]')) {
+  const reportButton = document.createElement('button');
+  reportButton.type = 'button';
+  reportButton.className = 'action-button report-button';
+  reportButton.dataset.action = 'report';
+  reportButton.setAttribute('aria-label', 'Denunciar ponto de esgoto próximo');
+  reportButton.innerHTML = '<span>!</span>DENÚNCIA';
+  actionCluster.prepend(reportButton);
+  dom.reportButton = reportButton;
+
+  const press = (event) => {
+    event.preventDefault();
+    if (!game.input.held('report')) game.input.justPressed.add('report');
+    game.input.pointer.add('report');
+    reportButton.setPointerCapture?.(event.pointerId);
+    navigator.vibrate?.(14);
+  };
+  const release = (event) => {
+    event.preventDefault();
+    game.input.pointer.delete('report');
+  };
+  reportButton.addEventListener('pointerdown', press);
+  reportButton.addEventListener('pointerup', release);
+  reportButton.addEventListener('pointercancel', release);
+}
+
+window.addEventListener('keydown', (event) => {
+  if (event.code !== 'KeyE') return;
+  event.preventDefault();
+  if (!game.input.held('report')) game.input.justPressed.add('report');
+  game.input.keyboard.add('report');
+});
+window.addEventListener('keyup', (event) => {
+  if (event.code !== 'KeyE') return;
+  event.preventDefault();
+  game.input.keyboard.delete('report');
+});
+
+const heroPanel = dom.menu?.querySelector('.hero-panel');
+if (heroPanel && !heroPanel.querySelector('.esgotei-ribbon')) {
+  const eyebrow = heroPanel.querySelector('.eyebrow');
+  const ribbon = document.createElement('div');
+  ribbon.className = 'esgotei-ribbon';
+  ribbon.innerHTML = '<span>EU ESGOTEI.</span><span>NÓS ESGOTAMOS.</span>';
+  eyebrow?.after(ribbon);
+
+  const credit = document.createElement('a');
+  credit.className = 'movement-credit';
+  credit.href = ESGOTEI_PROFILE_URL;
+  credit.target = '_blank';
+  credit.rel = 'noreferrer';
+  credit.innerHTML = '<b>REFERÊNCIA LOCAL</b><span>Movimento Esgotei · @movimentoesgotei</span><small>Projeto independente, sem vínculo oficial.</small>';
+  heroPanel.append(credit);
+}
+
+const desktopControls = document.querySelector('.desktop-controls-copy');
+if (desktopControls && !desktopControls.querySelector('.report-control-copy')) {
+  const row = document.createElement('div');
+  row.className = 'report-control-copy';
+  row.innerHTML = '<kbd>E</kbd><span>denunciar esgoto próximo</span>';
+  desktopControls.append(row);
+}
+
+const mobileCopy = document.querySelector('.mobile-controls-copy');
+if (mobileCopy && !mobileCopy.querySelector('.report-copy')) {
+  const row = document.createElement('span');
+  row.className = 'report-copy';
+  row.innerHTML = 'Aproxime-se da borda do esgoto e toque em <b>DENÚNCIA</b>.';
+  mobileCopy.append(row);
+}
+
+const cleanupLabel = document.querySelector('.cleanup-row > span');
+if (cleanupLabel) cleanupLabel.textContent = 'AÇÃO';
+
+const factCard = document.querySelector('.fact-card');
+if (factCard) {
+  const heading = factCard.querySelector(':scope > span');
+  if (heading) heading.textContent = 'DENÚNCIA + AÇÃO AMBIENTAL';
+  if (!factCard.querySelector('.esgotei-source')) {
+    const source = document.createElement('a');
+    source.className = 'esgotei-source';
+    source.href = ESGOTEI_PROFILE_URL;
+    source.target = '_blank';
+    source.rel = 'noreferrer';
+    source.textContent = 'Referência: Movimento Esgotei · @movimentoesgotei';
+    factCard.append(source);
+  }
+}
+
+const gameOverPanel = dom.gameover?.querySelector('.compact-panel');
+if (gameOverPanel && !document.querySelector('#final-reported')) {
+  const reportLine = document.createElement('p');
+  reportLine.className = 'final-score final-report-line';
+  reportLine.innerHTML = 'Denúncias <strong id="final-reported">0</strong>';
+  gameOverPanel.insertBefore(reportLine, dom.restart);
+  dom.finalReported = reportLine.querySelector('#final-reported');
+}
+
+const originalResetStats = Game.prototype.resetStats;
+Game.prototype.resetStats = function patchedResetStats() {
+  originalResetStats.call(this);
+  this.player.reported = 0;
+  this.roundReports = 0;
+  this.updateHud();
+};
+
+const originalBeginRound = Game.prototype.beginRound;
+Game.prototype.beginRound = function patchedBeginRound(first = false) {
+  this.roundReports = 0;
+  originalBeginRound.call(this, first);
+};
+
+const originalUpdateHud = Game.prototype.updateHud;
+Game.prototype.updateHud = function patchedUpdateHud() {
+  originalUpdateHud.call(this);
+  if (dom.reported) dom.reported.textContent = this.player?.reported || 0;
+};
+
+const originalFinishRound = Game.prototype.finishRound;
+Game.prototype.finishRound = function patchedFinishRound() {
+  const shouldFinish = this.state === 'playing';
+  originalFinishRound.call(this);
+  if (!shouldFinish) return;
+  const roundPoints = Math.max(0, Math.floor(this.player.score - this.roundScoreStart));
+  dom.roundReport.textContent = `${this.roundCleaned} itens recolhidos • ${this.roundReports || 0} denúncias • ${roundPoints.toLocaleString()} pontos • ${this.roundSewageHits} contatos com esgoto`;
+  dom.factText.textContent = LOCAL_FACTS[(this.round - 1) % LOCAL_FACTS.length];
+};
+
+const originalGameOver = Game.prototype.gameOver;
+Game.prototype.gameOver = function patchedGameOver() {
+  originalGameOver.call(this);
+  if (dom.finalReported) dom.finalReported.textContent = this.player?.reported || 0;
+};
+
+const originalCreateSewagePatch = Game.prototype.createSewagePatch;
+Game.prototype.createSewagePatch = function patchedCreateSewagePatch(...args) {
+  originalCreateSewagePatch.apply(this, args);
+  const item = this.pollution[this.pollution.length - 1];
+  if (!item || item.kind !== 'sewage') return;
+
+  item.reported = false;
+  const beacon = new THREE.Group();
+  const baseMaterial = toonMaterial(0x111417);
+  const redMaterial = toonMaterial(0xff3b30, { emissive: 0x8a0700, emissiveIntensity: 0.7 });
+  const whiteMaterial = toonMaterial(0xffffff);
+
+  const float = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.46, 0.3, 10), baseMaterial);
+  float.position.y = 0.12;
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.075, 1.25, 8), baseMaterial);
+  pole.position.y = 0.82;
+  const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.24, 10, 7), redMaterial);
+  lamp.position.y = 1.52;
+  lamp.scale.y = 0.78;
+  const exclamation = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.25, 0.08), whiteMaterial);
+  exclamation.position.set(0, 1.55, 0.22);
+  const dot = new THREE.Mesh(new THREE.SphereGeometry(0.055, 7, 5), whiteMaterial);
+  dot.position.set(0, 1.36, 0.22);
+  beacon.add(float, pole, lamp, exclamation, dot);
+  beacon.position.set(item.radius + 1.45, 0.08, 0);
+  beacon.userData.lamp = lamp;
+  item.mesh.add(beacon);
+  item.beacon = beacon;
+};
+
+Game.prototype.reportSewage = function reportSewage(item) {
+  if (!item || item.reported) return;
+  item.reported = true;
+  this.player.reported = (this.player.reported || 0) + 1;
+  this.roundReports = (this.roundReports || 0) + 1;
+  const points = Math.floor(260 * this.player.multiplier);
+  this.player.score += points;
+  this.player.flow = clamp(this.player.flow + 10, 0, 100);
+  this.cleanupCharge += 1;
+
+  if (item.beacon?.userData.lamp) {
+    item.beacon.userData.lamp.material.color.setHex(0x75f0a1);
+    item.beacon.userData.lamp.material.emissive?.setHex(0x167a3b);
+  }
+
+  const position = item.mesh.position.clone();
+  position.y += 1.4;
+  this.createBurst(position, [0xff3b30, 0xffffff, 0x75f0a1, 0xffef64], 15);
+  this.showCallout(`DENÚNCIA + AÇÃO +${points}`);
+  this.audio.tone(430, 0.08, 'square', 0.07, 360);
+  setTimeout(() => this.audio.tone(760, 0.12, 'triangle', 0.07, 260), 70);
+  navigator.vibrate?.([18, 35, 24]);
+  this.cameraShake = Math.max(this.cameraShake, 0.08);
+  this.squash = Math.max(this.squash, 0.16);
+
+  if (this.cleanupCharge >= this.mods.cleanupThreshold) {
+    this.cleanupCharge -= this.mods.cleanupThreshold;
+    this.grantCleanupReward();
+  }
+  this.updateHud();
+};
+
+const originalUpdateObjects = Game.prototype.updateObjects;
+Game.prototype.updateObjects = function patchedUpdateObjects(dt) {
+  const wantsReport = this.input.pressed('report');
+  originalUpdateObjects.call(this, dt);
+
+  let nearest = null;
+  let nearestDistance = Infinity;
+  for (const item of this.pollution) {
+    if (item.kind !== 'sewage' || item.reported) continue;
+    const dx = item.mesh.position.x - this.player.x;
+    const dz = item.mesh.position.z - this.playerZ;
+    const distance = Math.hypot(dx, dz);
+    const outerRange = item.radius + 3.1;
+    const safeInnerRange = item.radius * 0.68;
+
+    if (item.beacon) {
+      const pulse = 1 + Math.sin(this.time * 7 + item.phase) * 0.12;
+      item.beacon.scale.setScalar(pulse);
+      item.beacon.rotation.y = -item.mesh.rotation.y;
+    }
+
+    if (distance < outerRange && distance > safeInnerRange && distance < nearestDistance) {
+      nearest = item;
+      nearestDistance = distance;
+    }
+  }
+
+  const available = Boolean(nearest && this.state === 'playing');
+  dom.reportPrompt?.classList.toggle('show', available);
+  dom.reportButton?.classList.toggle('available', available);
+  dom.reportButton?.setAttribute('aria-disabled', available ? 'false' : 'true');
+  if (available && wantsReport) this.reportSewage(nearest);
+};
+
+const originalCollectTrash = Game.prototype.collectTrash;
+Game.prototype.collectTrash = function patchedCollectTrash(...args) {
+  const previous = this.player.cleaned;
+  originalCollectTrash.apply(this, args);
+  if (this.player.cleaned > previous && this.player.cleaned % 10 === 0) {
+    this.showCallout('TRANSFORME INDIGNAÇÃO EM ATITUDE');
+  }
+};
+
+const originalGrantCleanupReward = Game.prototype.grantCleanupReward;
+Game.prototype.grantCleanupReward = function patchedGrantCleanupReward() {
+  originalGrantCleanupReward.call(this);
+  if (dom.callout?.textContent.startsWith('ECO BONUS')) {
+    dom.callout.textContent = dom.callout.textContent.replace('ECO BONUS', 'AÇÃO AMBIENTAL');
+  }
+};
