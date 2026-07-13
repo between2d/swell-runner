@@ -7,7 +7,7 @@
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="description" content="Swell Runner: João Pessoa, a procedural arcade surfing game built with Three.js." />
+    <meta name="description" content="Swell Runner: João Pessoa, a round-based arcade cleanup surfing game built with Three.js." />
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" href="./icon.svg" type="image/svg+xml" />
     <title>Swell Runner: João Pessoa</title>
@@ -18,20 +18,31 @@
         <section class="hud-card stats">
           <span class="hud-label">SCORE</span>
           <strong id="score">0</strong>
-          <span class="hud-label">DISTANCE</span>
-          <strong><span id="distance">0</span> m</strong>
+          <span class="hud-label">CLEANED</span>
+          <strong><span id="cleaned">0</span> items</strong>
+          <span class="hud-label distance-row">DISTANCE</span>
+          <strong class="distance-row"><span id="distance">0</span> m</strong>
         </section>
 
         <section class="hud-card center-stats">
+          <div class="round-row">
+            <span id="round-label">ROUND 1</span>
+            <strong id="round-timer">00:35</strong>
+          </div>
           <div id="combo" class="combo">COMBO x1.0</div>
           <div class="flow-row">
             <span>FLOW</span>
             <div class="meter"><div id="flow-fill" class="meter-fill"></div></div>
           </div>
+          <div class="flow-row cleanup-row">
+            <span>ECO</span>
+            <div class="meter cleanup-meter"><div id="cleanup-fill" class="meter-fill cleanup-fill"></div></div>
+          </div>
         </section>
 
         <section class="hud-card right-stats">
           <div id="lives" class="lives" aria-label="Lives">● ● ●</div>
+          <div id="powerup-list" class="powerup-list" aria-label="Active powerups"></div>
           <div class="hud-actions">
             <button id="pause-button" class="icon-button mobile-only" type="button" aria-label="Pause game">Ⅱ</button>
             <button id="fullscreen-button" class="icon-button" type="button" aria-label="Toggle fullscreen">FULL</button>
@@ -45,21 +56,21 @@
 
       <section id="menu" class="overlay active">
         <div class="panel hero-panel">
-          <p class="eyebrow">JOÃO PESSOA • PARAÍBA • THREE.JS</p>
+          <p class="eyebrow">JOÃO PESSOA • PARAÍBA • ECO-CHAOS</p>
           <h1>SWELL<br /><span>RUNNER JP</span></h1>
-          <p class="tagline">Carve past Cabo Branco, dodge trash, clear sewage slicks, and survive the beautiful mess offshore.</p>
-          <button id="start-button" class="primary-button" type="button">DROP IN</button>
+          <p class="tagline">Surf 35-second rounds, collect floating garbage, avoid sewage, and choose one absurd permanent powerup after every round.</p>
+          <button id="start-button" class="primary-button" type="button">START CLEANUP</button>
           <div class="controls-grid desktop-controls-copy">
             <div><kbd>A</kbd><kbd>D</kbd><span>or arrows to carve</span></div>
             <div><kbd>W</kbd><kbd>S</kbd><span>control speed</span></div>
             <div><kbd>SPACE</kbd><span>jump, then spin</span></div>
-            <div><kbd>SHIFT</kbd><span>spend flow to boost</span></div>
+            <div><kbd>SHIFT</kbd><span>spend Flow to boost</span></div>
           </div>
           <div class="mobile-controls-copy">
             <span><b>DRAG</b> the left pad to carve and control speed.</span>
             <span><b>JUMP</b> over hazards. Hold <b>FLOW</b> for boost.</span>
           </div>
-          <p class="tiny">Portrait and landscape both work. Landscape gives you a wider line through the garbage.</p>
+          <p class="tiny">This is a fictional awareness game, not a live balneability map. Check official beach reports before swimming.</p>
         </div>
       </section>
 
@@ -71,12 +82,27 @@
         </div>
       </section>
 
+      <section id="upgrade-screen" class="overlay upgrade-overlay">
+        <div class="panel upgrade-panel">
+          <p id="round-report-title" class="eyebrow">ROUND 1 CLEANUP REPORT</p>
+          <h2>PICK YOUR CHAOS</h2>
+          <p id="round-report" class="round-report"></p>
+          <div id="powerup-choices" class="powerup-grid" aria-label="Choose one powerup"></div>
+          <aside class="fact-card">
+            <span>POR QUE ISSO IMPORTA</span>
+            <p id="fact-text"></p>
+            <small>Informação educativa. Consulte boletins oficiais de balneabilidade.</small>
+          </aside>
+        </div>
+      </section>
+
       <section id="gameover-screen" class="overlay">
         <div class="panel compact-panel">
-          <p class="eyebrow">THE OCEAN WON THIS ROUND</p>
+          <p class="eyebrow">THE OCEAN WON THIS RUN</p>
           <h2>WIPEOUT</h2>
           <p class="final-score">Score <strong id="final-score">0</strong></p>
           <p class="final-score">Distance <strong><span id="final-distance">0</span> m</strong></p>
+          <p class="final-score">Garbage collected <strong id="final-cleaned">0</strong></p>
           <button id="restart-button" class="primary-button" type="button">PADDLE BACK OUT</button>
         </div>
       </section>
@@ -94,6 +120,5 @@
       </div>
     </main>
     <script type="module" src="/src/main.js"></script>
-    <script type="module" src="/src/mobile.js"></script>
   </body>
 </html>
