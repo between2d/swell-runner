@@ -1,0 +1,377 @@
+state = 'menu';
+    this.time = 0;
+    this.isMobile = matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0;
+
+    this.renderer = new THREE.WebGLRenderer({ antialias: !this.isMobile, powerPreference: 'high-performance' });
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, this.isMobile ? 1.35 : 2));
+    this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.08;
+    this.renderer.shadowMap.enabled = !this.isMobile;
+    this.renderer.shadowMap.type = THREE.PCFShadowMap;
+    document.querySelector('#game-root').prepend(this.renderer.domElement);
+
+    this.scene = new THREE.Scene();
+    this.scene.background = new THREE.Color(0x7ed8f0);
+    this.scene.fog = new THREE.FogExp2(0x73c8df, 0.0088);
+
+    this.camera = new THREE.PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.1, 500);
+    this.camera.position.set(0, 7.3, 17);
+    this.camera.lookAt(0, 1.6, -10);
+
+    this.obstacles = [];
+    this.pickups = [];
+    this.pollution = [];
+    this.scenery = [];
+    this.effects = [];
+    this.projectiles = [];
+    this.seagulls = [];
+    this.sewageTexture = createSewageTexture();
+    this.playerZ = 5;
+    this.spawnTimer = 0;
+    this.lastTurn = 0;
+    this.comboTimer = 0;
+    this.calloutTimer = 0;
+    this.cameraShake = 0;
+    this.squash = 0;
+    this.lastGullCollect = -99;
+    this.coconutTimer = 2;
+
+    this.createLighting();
+    this.createSky();
+    this.createOcean();
+    this.createScenery();
+    this.createSurfer();
+    this.createFoam();
+    this.resetStats();
+
+    window.addEventListener('resize', () => this.resize());
+    this.renderer.setAnimationLoop(() => this.animate());
+  }
+
+  createLighting() {
+    const hemi = new THREE.HemisphereLight(0xeefcff, 0x19426a, 2.25);
+    this.scene.add(hemi);
+
+    const sun = new THREE.DirectionalLight(0xfff1c1, 3.2);
+    sun.position.set(-15, 30, 18);
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(1024, 1024);
+    sun.shadow.camera.left = -40;
+    sun.shadow.camera.right = 40;
+    sun.shadow.camera.top = 40;
+    sun.shadow.camera.bottom = -40;
+    this.scene.add(sun);
+  }
+
+  createSky() {
+    const sunMaterial = new THREE.MeshBasicMaterial({ color: 0xfff28a, fog: false });
+    const sun = new THREE.Mesh(new THREE.SphereGeometry(6, 32, 16), sunMaterial);
+    sun.position.set(-34, 28, -120);
+    this.scene.add(sun);
+
+    const cloudMaterial = new THREE.MeshLambertMaterial({ color: 0xffffff, transparent: true, opacity: 0.86, depthWrite: false });
+    for (let i = 0; i < 10; i += 1) {
+      const cloud = new THREE.Group();
+      const blobs = Math.floor(rand(3, 6));
+      for (let j = 0; j < blobs; j += 1) {
+        const blob = new THREE.Mesh(new THREE.SphereGeometry(rand(1.5, 3.5), 10, 7), cloudMaterial);
+        blob.position.set(j * 2.2 - blobs, rand(-0.4, 0.5), rand(-0.6, 0.6));
+        blob.scale.y = rand(0.55, 0.9);
+        cloud.add(blob);
+      }
+      cloud.position.set(rand(-58, 58), rand(15, 29), rand(-150, -45));
+      cloud.userData.speed = rand(0.25, 0.55);
+      this.scene.add(cloud);
+      this.scenery.push(cloud);
+    }
+  }
+
+  createOcean() {
+    const geometry = createOceanGeometry();
+    this.oceanMaterial = new THREE.ShaderMaterial({
+      uniforms: {
+        uTime: { value: 0 },
+        uSunDirection: { value: new THREE.Vector3(-0.3, 0.8, 0.4).normalize() },
+      },
+      vertexShader: `
+        uniform float uTime;
+        varying float vElevation;
+        varying vec3 vWorldPosition;
+
+        float getWave(vec2 p) {
+          float longWave = sin(p.y * 0.11 - uTime * 1.1 + p.x * 0.04) * 0.95;
+          float chop = sin(p.y * 0.24 + uTime * 1.75) * 0.62;
+          float crossWave = sin(p.x * 0.32 + p.y * 0.065 + uTime * 0.78) * 0.3;
+          float ridgeBase = max(0.0, sin(p.y * 0.074 + uTime * 0.86));
+          float ridge = pow(ridgeBase, 5.0) * 1.28;
+          return longWave + chop + crossWave + ridge;
+        }
+
+        void main() {
+          vec3 pos = position;
+          pos.y = getWave(pos.xz);
+          vElevation = pos.y;
+          vec4 world = modelMatrix * vec4(pos, 1.0);
+          vWorldPosition = world.xyz;
+          gl_Position = projectionMatrix * viewMatrix * world;
+        }
+      `,
+      fragmentShader: `
+        uniform vec3 uSunDirection;
+        varying float vElevation;
+        varying vec3 vWorldPosition;
+
+        void main() {
+          vec3 dx = dFdx(vWorldPosition);
+          vec3 dy = dFdy(vWorldPosition);
+          vec3 normal = normalize(cross(dx, dy));
+          if (normal.y < 0.0) normal *= -1.0;
+
+          float light = max(dot(normal, uSunDirection), 0.0);
+          float fresnel = pow(1.0 - max(normal.y, 0.0), 2.4);
+          float foam = smoothstep(1.15, 1.75, vElevation);
+          foam += smoothstep(0.72, 0.98, sin(vWorldPosition.z * 0.4 + vWorldPosition.x * 0.08) * 0.5 + 0.5) * smoothstep(0.75, 1.45, vElevation) * 0.28;
+
+          vec3 deep = vec3(0.005, 0.14, 0.27);
+          vec3 teal = vec3(0.02, 0.48, 0.56);
+          vec3 sky = vec3(0.28, 0.82, 0.91);
+          vec3 color = mix(deep, teal, clamp(vElevation * 0.23 + 0.48, 0.0, 1.0));
+          color = mix(color, sky, fresnel * 0.52);
+          color += light * vec3(0.20, 0.22, 0.15);
+          color = mix(color, vec3(0.9, 1.0, 0.98), clamp(foam, 0.0, 0.88));
+          gl_FragColor = vec4(color, 1.0);
+        }
+      `,
+      side: THREE.DoubleSide,
+    });
+
+    this.ocean = new THREE.Mesh(geometry, this.oceanMaterial);
+    this.ocean.receiveShadow = true;
+    this.ocean.frustumCulled = false;
+    this.scene.add(this.ocean);
+  }
+
+  createScenery() {
+    const sand = new THREE.MeshStandardMaterial({ color: 0xe4bd7a, roughness: 1 });
+    const promenade = new THREE.MeshStandardMaterial({ color: 0xa7a5a0, roughness: 0.95 });
+    const asphalt = new THREE.MeshStandardMaterial({ color: 0x404b50, roughness: 1 });
+    const green = new THREE.MeshStandardMaterial({ color: 0x39794b, roughness: 1 });
+    const cliff = new THREE.MeshStandardMaterial({ color: 0xb95d34, roughness: 1, flatShading: true });
+    const white = new THREE.MeshStandardMaterial({ color: 0xf4f0dc, roughness: 0.72 });
+    const red = new THREE.MeshStandardMaterial({ color: 0xd64836, roughness: 0.75 });
+    const palmTrunk = new THREE.MeshStandardMaterial({ color: 0x8c5a32, roughness: 1 });
+    const palmLeaf = new THREE.MeshStandardMaterial({ color: 0x277857, roughness: 0.9, side: THREE.DoubleSide });
+    const buildingColors = [0xf2eee5, 0xe7cfb4, 0xcad9dc, 0xd9b7a7, 0xbfd2c1, 0xe8e3cb];
+
+    const addPalm = (parent, x, z, scale = 1) => {
+      const palm = new THREE.Group();
+      const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.12 * scale, 0.23 * scale, 4.6 * scale, 7), palmTrunk);
+      trunk.position.y = 2.3 * scale;
+      trunk.rotation.z = rand(-0.12, 0.12);
+      palm.add(trunk);
+      for (let j = 0; j < 7; j += 1) {
+        const leaf = new THREE.Mesh(new THREE.ConeGeometry(0.48 * scale, 3.4 * scale, 5), palmLeaf);
+        leaf.position.y = 4.7 * scale;
+        leaf.rotation.z = Math.PI / 2.35;
+        leaf.rotation.y = (j / 7) * TAU;
+        palm.add(leaf);
+      }
+      palm.position.set(x, 0, z);
+      parent.add(palm);
+    };
+
+    const addTower = (parent, x, z, height, width, color) => {
+      const material = new THREE.MeshStandardMaterial({ color, roughness: 0.72 });
+      const tower = new THREE.Mesh(new THREE.BoxGeometry(width, height, rand(2.2, 3.8)), material);
+      tower.position.set(x, height / 2 + 1.05, z);
+      tower.castShadow = true;
+      parent.add(tower);
+
+      const windowMaterial = new THREE.MeshBasicMaterial({ color: 0x5e8290 });
+      const floors = Math.max(3, Math.floor(height / 2.2));
+      for (let floor = 1; floor < floors; floor += 1) {
+        const windows = new THREE.Mesh(new THREE.BoxGeometry(width * 0.74, 0.12, 0.04), windowMaterial);
+        windows.position.set(x, 1.35 + floor * (height / floors), z + tower.geometry.parameters.depth / 2 + 0.025);
+        parent.add(windows);
+      }
+    };
+
+    for (let i = 0; i < 8; i += 1) {
+      const coast = new THREE.Group();
+      const beach = new THREE.Mesh(new THREE.BoxGeometry(17, 0.7, 42), sand);
+      beach.position.set(0, -0.2, 0);
+      coast.add(beach);
+
+      const sidewalk = new THREE.Mesh(new THREE.BoxGeometry(5.2, 0.5, 42), promenade);
+      sidewalk.position.set(-7.5, 0.4, 0);
+      coast.add(sidewalk);
+
+      const road = new THREE.Mesh(new THREE.BoxGeometry(6.5, 0.28, 42), asphalt);
+      road.position.set(-13.2, 0.55, 0);
+      coast.add(road);
+
+      for (let j = 0; j < 6; j += 1) addPalm(coast, rand(-5.7, -2), -18 + j * 7 + rand(-1, 1), rand(0.82, 1.15));
+      for (let j = 0; j < 7; j += 1) {
+        addTower(coast, rand(-19.5, -16), -18 + j * 6 + rand(-1.5, 1.5), rand(8, 20), rand(2.2, 4), buildingColors[(i + j) % buildingColors.length]);
+      }
+
+      if (i % 2 === 0) {
+        const kiosk = new THREE.Group();
+        const kioskBase = new THREE.Mesh(new THREE.BoxGeometry(2.8, 1.5, 2.1), new THREE.MeshStandardMaterial({ color: i % 4 === 0 ? 0xf07d36 : 0x58a9a9, roughness: 0.8 }));
+        kioskBase.position.y = 0.95;
+        const roof = new THREE.Mesh(new THREE.ConeGeometry(2.2, 1.05, 4), white);
+        roof.position.y = 2.2;
+        roof.rotation.y = Math.PI / 4;
+        kiosk.add(kioskBase, roof);
+        kiosk.position.set(-4.4, 0.25, rand(-12, 12));
+        coast.add(kiosk);
+      }
+
+      if (i === 1) {
+        const hotel = new THREE.Group();
+        const ring = new THREE.Mesh(new THREE.TorusGeometry(5.1, 1.2, 8, 48), new THREE.MeshStandardMaterial({ color: 0xd4ccc1, roughness: 0.86 }));
+        ring.rotation.x = Math.PI / 2;
+        ring.scale.z = 0.34;
+        ring.position.y = 1.3;
+        hotel.add(ring);
+        const courtyard = new THREE.Mesh(new THREE.CylinderGeometry(2.5, 2.5, 0.25, 32), green);
+        courtyard.position.y = 0.42;
+        hotel.add(courtyard);
+        const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.18, 7.2, 8), red);
+        mast.position.y = 3.8;
+        hotel.add(mast);
+        addPalm(hotel, -1.6, 0.7, 0.65);
+        addPalm(hotel, 1.7, -0.8, 0.6);
+        hotel.position.set(0.5, 0, -2);
+        coast.add(hotel);
+      }
+
+      if (i === 4) {
+        const cape = new THREE.Group();
+        for (let j = 0; j < 5; j += 1) {
+          const chunk = new THREE.Mesh(new THREE.DodecahedronGeometry(rand(2.8, 4.8), 0), cliff);
+          chunk.scale.set(rand(1.3, 2), rand(0.9, 1.5), rand(1.2, 2.1));
+          chunk.position.set(j * 2.6 - 4.5, rand(1.2, 2.5), rand(-3.5, 3.5));
+          cape.add(chunk);
+        }
+        const cap = new THREE.Mesh(new THREE.BoxGeometry(15, 0.8, 9), green);
+        cap.position.y = 5.2;
+        cape.add(cap);
+
+        const lighthouse = new THREE.Group();
+        const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.92, 6.5, 12), white);
+        shaft.position.y = 8.5;
+        lighthouse.add(shaft);
+        for (let fin = 0; fin < 3; fin += 1) {
+          const wing = new THREE.Mesh(new THREE.BoxGeometry(0.35, 4.5, 4.8), white);
+          wing.position.y = 7.25;
+          wing.rotation.y = (fin / 3) * TAU;
+          wing.position.x = Math.sin(wing.rotation.y) * 1.5;
+          wing.position.z = Math.cos(wing.rotation.y) * 1.5;
+          lighthouse.add(wing);
+        }
+        const lantern = new THREE.Mesh(new THREE.SphereGeometry(0.48, 12, 8), red);
+        lantern.position.y = 12;
+        lighthouse.add(lantern);
+        lighthouse.position.set(0.4, 0, 0);
+        cape.add(lighthouse);
+        cape.position.set(-0.5, 0, 0);
+        coast.add(cape);
+      }
+
+      if (i === 5) {
+        const pipeMaterial = new THREE.MeshStandardMaterial({ color: 0x555b52, roughness: 1 });
+        const pipe = new THREE.Mesh(new THREE.CylinderGeometry(0.72, 0.72, 10, 12), pipeMaterial);
+        pipe.rotation.z = Math.PI / 2;
+        pipe.position.set(4.5, 0.55, -4);
+        coast.add(pipe);
+        const mouth = new THREE.Mesh(new THREE.TorusGeometry(0.72, 0.18, 8, 18), new THREE.MeshStandardMaterial({ color: 0x28291f, roughness: 1 }));
+        mouth.rotation.y = Math.PI / 2;
+        mouth.position.set(9.5, 0.55, -4);
+        coast.add(mouth);
+      }
+
+      if (i === 6) {
+        const sign = new THREE.Mesh(
+          new THREE.PlaneGeometry(8.5, 2.65),
+          new THREE.MeshBasicMaterial({ map: createSignTexture('JOÃO PESSOA'), side: THREE.DoubleSide }),
+        );
+        sign.position.set(-9.9, 5.4, 0);
+        sign.rotation.y = Math.PI / 2;
+        coast.add(sign);
+      }
+
+      coast.position.set(-42, 0, -i * 42);
+      coast.userData.kind = 'coast';
+      this.scene.add(coast);
+      this.scenery.push(coast);
+    }
+
+    const boatMaterial = new THREE.MeshStandardMaterial({ color: 0x346b86, roughness: 0.8 });
+    for (let i = 0; i < 8; i += 1) {
+      const boat = new THREE.Group();
+      const hull = new THREE.Mesh(new THREE.CapsuleGeometry(0.38, 2.1, 5, 10), boatMaterial);
+      hull.rotation.z = Math.PI / 2;
+      hull.scale.y = 0.44;
+      boat.add(hull);
+      const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.05, 2.1, 6), white);
+      mast.position.y = 1.15;
+      boat.add(mast);
+      boat.position.set(rand(25, 43), rand(-0.2, 0.2), -i * 36 - rand(8, 25));
+      boat.userData.kind = 'boat';
+      boat.userData.bob = rand(0, TAU);
+      this.scene.add(boat);
+      this.scenery.push(boat);
+    }
+  }
+
+  createSurfer() {
+    const skin = toonMaterial(0xc8865b);
+    const suit = toonMaterial(0x1e2048);
+    const suitAccent = toonMaterial(0xff6bb5);
+    const boardMaterial = toonMaterial(0xfffdf2);
+    const stripeMaterial = toonMaterial(0xffef64);
+    const ink = toonMaterial(0x061629);
+
+    this.surfer = new THREE.Group();
+    this.board = new THREE.Group();
+
+    this.boardMesh = new THREE.Mesh(new THREE.CapsuleGeometry(0.48, 3.55, 8, 18), boardMaterial);
+    this.boardMesh.rotation.x = Math.PI / 2;
+    this.boardMesh.scale.set(1.4, 1, 0.26);
+    this.boardMesh.castShadow = true;
+    addOutline(this.boardMesh, 1.055, 0.82);
+    this.board.add(this.boardMesh);
+
+    const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.055, 3.2), stripeMaterial);
+    stripe.position.y = 0.34;
+    addOutline(stripe, 1.08, 0.6);
+    this.board.add(stripe);
+
+    const fin = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.55, 5), suitAccent);
+    fin.position.set(0, -0.22, 1.42);
+    fin.rotation.x = Math.PI;
+    addOutline(fin, 1.06, 0.65);
+    this.board.add(fin);
+    this.surfer.add(this.board);
+
+    const body = new THREE.Group();
+    body.position.y = 1.55;
+    body.rotation.z = -0.08;
+    this.body = body;
+
+    this.torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.36, 0.72, 6, 10), suit);
+    this.torso.castShadow = true;
+    addOutline(this.torso, 1.055, 0.8);
+    body.add(this.torso);
+
+    const chest = new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.48, 0.22), suitAccent);
+    chest.position.set(0, 0.22, 0.27);
+    addOutline(chest, 1.06, 0.65);
+    body.add(chest);
+
+    this.head = new THREE.Mesh(new THREE.SphereGeometry(0.36, 14, 10), skin);
+    this.head.position.y = 1.02;
+    this.head.scale.set(1.05, 1.08, 1);
