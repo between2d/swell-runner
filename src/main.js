@@ -89,7 +89,7 @@ const THREE = {
   Vector3,
   WebGLRenderer,
 };
-const chunkCount = 6;
+const chunkCount = 7;
 const loading = document.createElement('div');
 loading.className = 'runtime-loading';
 loading.textContent = 'LOADING THE DIRTY OCEAN…';
