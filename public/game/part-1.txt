@@ -1,0 +1,387 @@
+
+const clamp = THREE.MathUtils.clamp;
+const lerp = THREE.MathUtils.lerp;
+const rand = (min, max) => min + Math.random() * (max - min);
+const TAU = Math.PI * 2;
+const ROUND_SECONDS = 35;
+
+const LOCAL_FACTS = [
+  'O Rio do Cabelo deságua entre as praias da Penha e do Seixas e sofre pressão urbana, despejo de esgoto e degradação ao longo do percurso.',
+  'O antigo leito do Jaguaribe no Bessa, conhecido como maceió, tem histórico de poluição por descargas urbanas.',
+  'Depois de chuva forte, lixo e esgoto acumulados em ruas, canais e galerias podem ser carregados para rios e praias.',
+  'Água contaminada por esgoto pode causar gastroenterite e infecções nos olhos, ouvidos, nariz e garganta.',
+  'Evite banho perto de saídas de canais, riachos e galerias, principalmente depois de chuva forte.',
+  'A água pode parecer limpa e ainda assim estar contaminada. Aparência não substitui um boletim de balneabilidade.',
+];
+
+const POWERUPS = [
+  { id: 'gulls', badge: 'GULL', name: 'Sindicato das Gaivotas', description: 'Gaivotas sindicalizadas orbitam você e recolhem lixo próximo. Cada nível chama mais colegas para o turno.' },
+  { id: 'magnet', badge: 'MAG', name: 'Ímã de Lixo Suspeito', description: 'Garrafas, latas e sacolas começam a deslizar até a prancha. A física reclama, o oceano agradece.' },
+  { id: 'giant', badge: 'BIG', name: 'Pranchão de Tambaú', description: 'Você e a prancha ficam enormes. A área de coleta aumenta e a animação perde toda a dignidade.' },
+  { id: 'tiny', badge: 'MINI', name: 'Surfista de Bolso', description: 'Você encolhe, acelera e vira mais rápido. Pequeno, nervoso e estranhamente eficiente.' },
+  { id: 'coconut', badge: 'COCO', name: 'Canhão de Coco', description: 'Dispara cocos automaticamente e desmonta pedras e boias antes que virem problema trabalhista.' },
+  { id: 'bubble', badge: 'POP', name: 'Bolha Biodegradável', description: 'Comece cada rodada com uma bolha que absorve um impacto ou contato com esgoto.' },
+  { id: 'flipflops', badge: 'BOING', name: 'Chinelo Mutante', description: 'Pulos maiores e giros mais rápidos. Certificação científica: absolutamente nenhuma.' },
+  { id: 'recycling', badge: '2X', name: 'Influencer da Reciclagem', description: 'Cada lixo recolhido vale mais pontos. Finalmente um influencer que serve para alguma coisa.' },
+  { id: 'flow', badge: 'FLOW', name: 'Caldo de Cana Turbo', description: 'O lixo recupera mais Flow e o boost gasta menos. Açúcar, caos e responsabilidade ambiental.' },
+  { id: 'burst', badge: 'ECO', name: 'Combo Ecobagunça', description: 'Bônus temporários aparecem com menos itens recolhidos. A coleta seletiva entra em modo arcade.' },
+];
+
+const CLEANUP_REWARDS = [
+  { id: 'double', label: '2X LIMPEZA', description: 'Pontos de coleta dobrados por 9 segundos.' },
+  { id: 'magnet', label: 'SUPER ÍMÃ', description: 'Um ímã gigante puxa lixo por 10 segundos.' },
+  { id: 'flow', label: 'FLOW VERDE', description: 'Flow cheio imediatamente.' },
+  { id: 'shield', label: 'BOLHA EXTRA', description: 'Ganha uma proteção contra impacto ou esgoto.' },
+  { id: 'turbo', label: 'MARÉ TURBO', description: 'Velocidade e pontuação aumentadas por 8 segundos.' },
+];
+
+const powerupById = (id) => POWERUPS.find((item) => item.id === id);
+
+const dom = {
+  hud: document.querySelector('#hud'),
+  menu: document.querySelector('#menu'),
+  pause: document.querySelector('#pause-screen'),
+  upgrade: document.querySelector('#upgrade-screen'),
+  gameover: document.querySelector('#gameover-screen'),
+  start: document.querySelector('#start-button'),
+  resume: document.querySelector('#resume-button'),
+  restart: document.querySelector('#restart-button'),
+  sound: document.querySelector('#sound-button'),
+  score: document.querySelector('#score'),
+  cleaned: document.querySelector('#cleaned'),
+  distance: document.querySelector('#distance'),
+  combo: document.querySelector('#combo'),
+  flow: document.querySelector('#flow-fill'),
+  cleanup: document.querySelector('#cleanup-fill'),
+  lives: document.querySelector('#lives'),
+  roundLabel: document.querySelector('#round-label'),
+  roundTimer: document.querySelector('#round-timer'),
+  powerupList: document.querySelector('#powerup-list'),
+  powerupChoices: document.querySelector('#powerup-choices'),
+  roundReportTitle: document.querySelector('#round-report-title'),
+  roundReport: document.querySelector('#round-report'),
+  factText: document.querySelector('#fact-text'),
+  finalScore: document.querySelector('#final-score'),
+  finalDistance: document.querySelector('#final-distance'),
+  finalCleaned: document.querySelector('#final-cleaned'),
+  callout: document.querySelector('#callout'),
+  flash: document.querySelector('#flash'),
+};
+
+class Input {
+  constructor() {
+    this.keyboard = new Set();
+    this.pointer = new Set();
+    this.gamepad = new Set();
+    this.justPressed = new Set();
+
+    const aliases = {
+      ArrowLeft: 'left', KeyA: 'left',
+      ArrowRight: 'right', KeyD: 'right',
+      ArrowUp: 'up', KeyW: 'up',
+      ArrowDown: 'down', KeyS: 'down',
+      Space: 'jump',
+      ShiftLeft: 'boost', ShiftRight: 'boost',
+      KeyP: 'pause', Escape: 'pause',
+    };
+
+    window.addEventListener('keydown', (event) => {
+      const action = aliases[event.code];
+      if (!action) return;
+      event.preventDefault();
+      if (!this.held(action)) this.justPressed.add(action);
+      this.keyboard.add(action);
+    });
+
+    window.addEventListener('keyup', (event) => {
+      const action = aliases[event.code];
+      if (!action) return;
+      event.preventDefault();
+      this.keyboard.delete(action);
+    });
+
+    window.addEventListener('blur', () => {
+      this.keyboard.clear();
+      this.pointer.clear();
+      this.gamepad.clear();
+    });
+
+    for (const button of document.querySelectorAll('[data-action]')) {
+      const action = button.dataset.action;
+      const press = (event) => {
+        event.preventDefault();
+        if (!this.held(action)) this.justPressed.add(action);
+        this.pointer.add(action);
+        button.setPointerCapture?.(event.pointerId);
+      };
+      const release = (event) => {
+        event.preventDefault();
+        this.pointer.delete(action);
+      };
+      button.addEventListener('pointerdown', press);
+      button.addEventListener('pointerup', release);
+      button.addEventListener('pointercancel', release);
+    }
+  }
+
+  held(action) {
+    return this.keyboard.has(action) || this.pointer.has(action) || this.gamepad.has(action);
+  }
+
+  pressed(action) {
+    if (!this.justPressed.has(action)) return false;
+    this.justPressed.delete(action);
+    return true;
+  }
+
+  updateGamepad() {
+    const pad = navigator.getGamepads?.()[0];
+    const states = pad ? {
+      left: pad.axes[0] < -0.2 || pad.buttons[14]?.pressed,
+      right: pad.axes[0] > 0.2 || pad.buttons[15]?.pressed,
+      up: pad.axes[1] < -0.2 || pad.buttons[12]?.pressed,
+      down: pad.axes[1] > 0.2 || pad.buttons[13]?.pressed,
+      jump: pad.buttons[0]?.pressed,
+      boost: pad.buttons[1]?.pressed || pad.buttons[7]?.pressed,
+    } : {};
+
+    for (const action of ['left', 'right', 'up', 'down', 'jump', 'boost']) {
+      const active = Boolean(states[action]);
+      const wasActive = this.gamepad.has(action);
+      if (active && !wasActive && !this.keyboard.has(action) && !this.pointer.has(action)) {
+        this.justPressed.add(action);
+      }
+      if (active) this.gamepad.add(action);
+      else this.gamepad.delete(action);
+    }
+  }
+
+  endFrame() {
+    this.justPressed.clear();
+  }
+}
+
+class AudioEngine {
+  constructor() {
+    this.context = null;
+    this.master = null;
+    this.enabled = true;
+  }
+
+  start() {
+    if (this.context) {
+      this.context.resume();
+      return;
+    }
+
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) return;
+
+    this.context = new AudioContextClass();
+    this.master = this.context.createGain();
+    this.master.gain.value = this.enabled ? 0.72 : 0;
+    this.master.connect(this.context.destination);
+
+    const seconds = 3;
+    const buffer = this.context.createBuffer(1, this.context.sampleRate * seconds, this.context.sampleRate);
+    const data = buffer.getChannelData(0);
+    let brown = 0;
+    for (let i = 0; i < data.length; i += 1) {
+      brown = (brown + (Math.random() * 2 - 1) * 0.055) / 1.02;
+      data[i] = brown * 2.8;
+    }
+
+    const noise = this.context.createBufferSource();
+    const filter = this.context.createBiquadFilter();
+    const gain = this.context.createGain();
+    noise.buffer = buffer;
+    noise.loop = true;
+    filter.type = 'lowpass';
+    filter.frequency.value = 700;
+    gain.gain.value = 0.055;
+    noise.connect(filter).connect(gain).connect(this.master);
+    noise.start();
+  }
+
+  tone(frequency = 440, duration = 0.12, type = 'sine', volume = 0.12, glide = 0) {
+    if (!this.context || !this.enabled) return;
+    const now = this.context.currentTime;
+    const oscillator = this.context.createOscillator();
+    const gain = this.context.createGain();
+    oscillator.type = type;
+    oscillator.frequency.setValueAtTime(frequency, now);
+    if (glide) oscillator.frequency.exponentialRampToValueAtTime(Math.max(30, frequency + glide), now + duration);
+    gain.gain.setValueAtTime(volume, now);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+    oscillator.connect(gain).connect(this.master);
+    oscillator.start(now);
+    oscillator.stop(now + duration);
+  }
+
+  crash() {
+    if (!this.context || !this.enabled) return;
+    const now = this.context.currentTime;
+    const buffer = this.context.createBuffer(1, this.context.sampleRate * 0.5, this.context.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < data.length; i += 1) data[i] = (Math.random() * 2 - 1) * (1 - i / data.length);
+    const source = this.context.createBufferSource();
+    const filter = this.context.createBiquadFilter();
+    const gain = this.context.createGain();
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(1100, now);
+    filter.frequency.exponentialRampToValueAtTime(120, now + 0.5);
+    gain.gain.value = 0.25;
+    source.buffer = buffer;
+    source.connect(filter).connect(gain).connect(this.master);
+    source.start();
+  }
+
+  toggle() {
+    this.enabled = !this.enabled;
+    if (this.master && this.context) {
+      this.master.gain.setTargetAtTime(this.enabled ? 0.72 : 0, this.context.currentTime, 0.03);
+    }
+    return this.enabled;
+  }
+}
+
+function waveHeight(x, z, time) {
+  const longWave = Math.sin(z * 0.11 - time * 1.1 + x * 0.04) * 0.95;
+  const chop = Math.sin(z * 0.24 + time * 1.75) * 0.62;
+  const cross = Math.sin(x * 0.32 + z * 0.065 + time * 0.78) * 0.3;
+  const ridgeBase = Math.max(0, Math.sin(z * 0.074 + time * 0.86));
+  const ridge = ridgeBase ** 5 * 1.28;
+  return longWave + chop + cross + ridge;
+}
+
+function createOceanGeometry(width = 92, length = 250, segmentsX = 92, segmentsZ = 190) {
+  const vertices = [];
+  const indices = [];
+  for (let iz = 0; iz <= segmentsZ; iz += 1) {
+    const z = -190 + (iz / segmentsZ) * length;
+    for (let ix = 0; ix <= segmentsX; ix += 1) {
+      const x = -width / 2 + (ix / segmentsX) * width;
+      vertices.push(x, 0, z);
+    }
+  }
+
+  for (let iz = 0; iz < segmentsZ; iz += 1) {
+    for (let ix = 0; ix < segmentsX; ix += 1) {
+      const a = iz * (segmentsX + 1) + ix;
+      const b = a + 1;
+      const c = a + segmentsX + 1;
+      const d = c + 1;
+      indices.push(a, c, b, b, c, d);
+    }
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+  geometry.setIndex(indices);
+  geometry.computeBoundingSphere();
+  return geometry;
+}
+
+function makeCylinderBetween(radius, length, material) {
+  return new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, length, 8), material);
+}
+
+function createSewageTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 256;
+  const context = canvas.getContext('2d');
+  const gradient = context.createRadialGradient(128, 128, 10, 128, 128, 124);
+  gradient.addColorStop(0, 'rgba(57, 46, 13, 0.92)');
+  gradient.addColorStop(0.28, 'rgba(85, 84, 22, 0.82)');
+  gradient.addColorStop(0.62, 'rgba(45, 89, 44, 0.48)');
+  gradient.addColorStop(1, 'rgba(26, 64, 62, 0)');
+  context.fillStyle = gradient;
+  context.fillRect(0, 0, 256, 256);
+
+  for (let i = 0; i < 70; i += 1) {
+    const x = rand(20, 236);
+    const y = rand(20, 236);
+    const radius = rand(1, 7);
+    context.beginPath();
+    context.arc(x, y, radius, 0, TAU);
+    context.fillStyle = `rgba(170, 151, 67, ${rand(0.05, 0.2)})`;
+    context.fill();
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.wrapS = THREE.ClampToEdgeWrapping;
+  texture.wrapT = THREE.ClampToEdgeWrapping;
+  return texture;
+}
+
+function createSignTexture(text, background = '#0c6d98', foreground = '#ffffff') {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 160;
+  const context = canvas.getContext('2d');
+  context.fillStyle = background;
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.strokeStyle = 'rgba(255,255,255,.85)';
+  context.lineWidth = 10;
+  context.strokeRect(8, 8, canvas.width - 16, canvas.height - 16);
+  context.fillStyle = foreground;
+  context.font = '900 62px Arial';
+  context.textAlign = 'center';
+  context.textBaseline = 'middle';
+  context.fillText(text, canvas.width / 2, canvas.height / 2 + 4);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}
+
+
+const toonGradient = (() => {
+  const data = new Uint8Array([35, 105, 185, 255]);
+  const texture = new THREE.DataTexture(data, 4, 1, THREE.RedFormat);
+  texture.needsUpdate = true;
+  texture.minFilter = THREE.NearestFilter;
+  texture.magFilter = THREE.NearestFilter;
+  texture.generateMipmaps = false;
+  return texture;
+})();
+
+function toonMaterial(color, options = {}) {
+  return new THREE.MeshToonMaterial({ color, gradientMap: toonGradient, ...options });
+}
+
+function addOutline(mesh, thickness = 1.045, opacity = 0.72) {
+  const outline = new THREE.Mesh(
+    mesh.geometry,
+    new THREE.MeshBasicMaterial({ color: 0x061629, side: THREE.BackSide, transparent: true, opacity, depthWrite: false }),
+  );
+  outline.scale.setScalar(thickness);
+  outline.castShadow = false;
+  outline.receiveShadow = false;
+  mesh.add(outline);
+  return outline;
+}
+
+function addCartoonEyes(parent, position = [0, 0.3, 0.35], scale = 1) {
+  const white = toonMaterial(0xffffff);
+  const black = toonMaterial(0x061629);
+  const eyes = new THREE.Group();
+  for (const side of [-1, 1]) {
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.11 * scale, 8, 6), white);
+    eye.position.set(side * 0.13 * scale, 0, 0);
+    const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.045 * scale, 7, 5), black);
+    pupil.position.set(side * 0.13 * scale, 0, 0.095 * scale);
+    eyes.add(eye, pupil);
+  }
+  eyes.position.set(...position);
+  parent.add(eyes);
+  return eyes;
+}
+
+class Game {
+  constructor() {
+    this.input = new Input();
+    this.audio = new AudioEngine();
+    this.lastFrame = performance.now();
+    this.
