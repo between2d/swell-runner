@@ -1,0 +1,37 @@
+
+// Small safety and interface fixes for the reporting mechanic.
+const esgoteiReportSewage = Game.prototype.reportSewage;
+Game.prototype.reportSewage = function safeReportSewage(item) {
+  if (!item) return;
+  const distance = Math.hypot(item.mesh.position.x - this.player.x, item.mesh.position.z - this.playerZ);
+  if (distance <= item.radius * 0.88) {
+    this.showCallout('AFASTE-SE DO ESGOTO PARA DENUNCIAR');
+    this.audio.tone(150, 0.12, 'square', 0.05, -40);
+    navigator.vibrate?.(18);
+    return;
+  }
+  esgoteiReportSewage.call(this, item);
+};
+
+const hideReportInterface = () => {
+  dom.reportPrompt?.classList.remove('show');
+  dom.reportButton?.classList.remove('available');
+};
+
+const esgoteiFinishRound = Game.prototype.finishRound;
+Game.prototype.finishRound = function hideReportOnRoundEnd() {
+  esgoteiFinishRound.call(this);
+  hideReportInterface();
+};
+
+const esgoteiGameOver = Game.prototype.gameOver;
+Game.prototype.gameOver = function hideReportOnGameOver() {
+  esgoteiGameOver.call(this);
+  hideReportInterface();
+};
+
+const esgoteiTogglePause = Game.prototype.togglePause;
+Game.prototype.togglePause = function hideReportOnPause() {
+  esgoteiTogglePause.call(this);
+  if (this.state !== 'playing') hideReportInterface();
+};
