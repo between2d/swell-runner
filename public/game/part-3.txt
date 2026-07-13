@@ -1,0 +1,386 @@
+
+    this.head.castShadow = true;
+    addOutline(this.head, 1.055, 0.82);
+    body.add(this.head);
+
+    this.hair = new THREE.Mesh(new THREE.SphereGeometry(0.37, 10, 7, 0, TAU, 0, Math.PI / 2), toonMaterial(0x2a1712));
+    this.hair.position.y = 1.14;
+    this.hair.rotation.x = Math.PI;
+    addOutline(this.hair, 1.04, 0.7);
+    body.add(this.hair);
+
+    const eyeWhite = toonMaterial(0xffffff);
+    for (const side of [-1, 1]) {
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.075, 8, 6), eyeWhite);
+      eye.position.set(side * 0.13, 1.06, 0.31);
+      const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.032, 7, 5), ink);
+      pupil.position.set(side * 0.13, 1.055, 0.376);
+      body.add(eye, pupil);
+    }
+    const nose = new THREE.Mesh(new THREE.ConeGeometry(0.055, 0.14, 6), skin);
+    nose.position.set(0, 0.99, 0.39);
+    nose.rotation.x = Math.PI / 2;
+    body.add(nose);
+
+    this.leftArm = makeCylinderBetween(0.115, 1.0, suit);
+    this.rightArm = makeCylinderBetween(0.115, 1.0, suit);
+    this.leftArm.position.set(-0.63, 0.14, 0);
+    this.rightArm.position.set(0.63, 0.14, 0);
+    this.leftArm.rotation.z = -1.16;
+    this.rightArm.rotation.z = 1.16;
+    addOutline(this.leftArm, 1.07, 0.72);
+    addOutline(this.rightArm, 1.07, 0.72);
+    body.add(this.leftArm, this.rightArm);
+
+    this.leftHand = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 6), skin);
+    this.rightHand = this.leftHand.clone();
+    this.leftHand.position.set(-1.08, 0.55, 0);
+    this.rightHand.position.set(1.08, 0.55, 0);
+    body.add(this.leftHand, this.rightHand);
+
+    this.leftLeg = makeCylinderBetween(0.145, 1.15, suit);
+    this.rightLeg = makeCylinderBetween(0.145, 1.15, suit);
+    this.leftLeg.position.set(-0.34, -0.95, -0.2);
+    this.rightLeg.position.set(0.36, -0.95, 0.15);
+    this.leftLeg.rotation.z = -0.24;
+    this.rightLeg.rotation.z = 0.24;
+    this.leftLeg.rotation.x = 0.34;
+    this.rightLeg.rotation.x = -0.28;
+    addOutline(this.leftLeg, 1.06, 0.72);
+    addOutline(this.rightLeg, 1.06, 0.72);
+    body.add(this.leftLeg, this.rightLeg);
+
+    this.surfer.add(body);
+    this.shieldBubble = new THREE.Mesh(
+      new THREE.SphereGeometry(1.75, 20, 14),
+      new THREE.MeshBasicMaterial({ color: 0x67f7ff, transparent: true, opacity: 0.13, wireframe: true, depthWrite: false }),
+    );
+    this.shieldBubble.position.y = 0.55;
+    this.shieldBubble.visible = false;
+    this.surfer.add(this.shieldBubble);
+    this.scene.add(this.surfer);
+  }
+
+  createFoam() {
+    this.foamCount = 260;
+    this.foamPositions = new Float32Array(this.foamCount * 3);
+    this.foamLives = new Float32Array(this.foamCount);
+    this.foamDrift = new Float32Array(this.foamCount);
+    this.foamCursor = 0;
+    for (let i = 0; i < this.foamCount; i += 1) this.foamPositions[i * 3 + 1] = -100;
+
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.BufferAttribute(this.foamPositions, 3));
+    const material = new THREE.PointsMaterial({
+      color: 0xf2ffff,
+      size: 0.34,
+      transparent: true,
+      opacity: 0.78,
+      depthWrite: false,
+      sizeAttenuation: true,
+    });
+    this.foam = new THREE.Points(geometry, material);
+    this.scene.add(this.foam);
+  }
+
+  resetStats() {
+    this.player = {
+      x: 0,
+      vx: 0,
+      speed: 19,
+      jumpY: 0,
+      vy: 0,
+      grounded: true,
+      airSpin: 0,
+      spinDirection: 0,
+      score: 0,
+      distance: 0,
+      combo: 0,
+      multiplier: 1,
+      flow: 30,
+      lives: 3,
+      invulnerable: 0,
+      cleaned: 0,
+      shield: 0,
+    };
+    this.round = 1;
+    this.roundTime = ROUND_SECONDS;
+    this.roundCleaned = 0;
+    this.roundSewageHits = 0;
+    this.roundScoreStart = 0;
+    this.cleanupCharge = 0;
+    this.upgrades = {};
+    this.temp = { double: 0, magnet: 0, turbo: 0 };
+    this.lastTurn = 0;
+    this.comboTimer = 0;
+    this.spawnTimer = 0.7;
+    this.clearObjects();
+    this.recalculateMods();
+    this.updateHud();
+  }
+
+  clearObjects() {
+    for (const item of [...this.obstacles, ...this.pickups, ...this.pollution]) this.scene.remove(item.mesh);
+    for (const projectile of this.projectiles) this.scene.remove(projectile.mesh);
+    this.obstacles.length = 0;
+    this.pickups.length = 0;
+    this.pollution.length = 0;
+    this.projectiles.length = 0;
+  }
+
+  start() {
+    this.audio.start();
+    this.resetStats();
+    dom.menu.classList.remove('active');
+    dom.pause.classList.remove('active');
+    dom.upgrade.classList.remove('active');
+    dom.gameover.classList.remove('active');
+    dom.hud.classList.remove('hidden');
+    this.beginRound(true);
+  }
+
+  beginRound(first = false) {
+    this.roundTime = ROUND_SECONDS;
+    this.roundCleaned = 0;
+    this.roundSewageHits = 0;
+    this.roundScoreStart = this.player.score;
+    this.player.shield = this.mods.shieldPerRound;
+    this.player.invulnerable = Math.max(this.player.invulnerable, 1.35);
+    this.spawnTimer = 0.55;
+    this.coconutTimer = 1.5;
+    this.clearObjects();
+
+    // Give every round a readable opening: useful trash first, then the nonsense begins.
+    this.createTrash(-7.5, -15, 'bottle');
+    this.createTrash(-3.8, -18.5, 'bag');
+    this.createTrash(5.4, -22, 'can');
+    if (this.round > 1) this.createSewagePatch(10, -35, 4.4);
+
+    this.state = 'playing';
+    dom.upgrade.classList.remove('active');
+    dom.pause.classList.remove('active');
+    this.lastFrame = performance.now();
+    this.showCallout(first ? 'ROUND 1: LIMPA ESSA ONDA!' : `ROUND ${this.round}: VAI!`);
+    this.audio.tone(first ? 420 : 520, 0.16, 'square', 0.08, 260);
+    this.updateHud();
+  }
+
+  togglePause() {
+    if (this.state === 'playing') {
+      this.state = 'paused';
+      dom.pause.classList.add('active');
+    } else if (this.state === 'paused') {
+      this.state = 'playing';
+      dom.pause.classList.remove('active');
+      this.lastFrame = performance.now();
+    }
+  }
+
+  gameOver() {
+    this.state = 'gameover';
+    dom.finalScore.textContent = Math.floor(this.player.score).toLocaleString();
+    dom.finalDistance.textContent = Math.floor(this.player.distance).toLocaleString();
+    dom.finalCleaned.textContent = this.player.cleaned.toLocaleString();
+    dom.gameover.classList.add('active');
+    dom.upgrade.classList.remove('active');
+    dom.hud.classList.add('hidden');
+  }
+
+  recalculateMods() {
+    const level = (id) => this.upgrades[id] || 0;
+    this.mods = {
+      trashRadius: 1.05 + level('magnet') * 0.48 + level('giant') * 0.3,
+      magnetRadius: level('magnet') * 5.8,
+      trashScore: 1 + level('recycling') * 0.55,
+      flowGain: 1 + level('flow') * 0.38,
+      boostDrain: Math.max(0.42, 1 - level('flow') * 0.14),
+      jump: 1 + level('flipflops') * 0.18,
+      spin: 1 + level('flipflops') * 0.22,
+      speed: 1 + level('tiny') * 0.06,
+      steer: 1 + level('tiny') * 0.09,
+      scale: clamp((1 + level('giant') * 0.18) * (1 - level('tiny') * 0.11), 0.55, 1.85),
+      gulls: level('gulls'),
+      autoCleanRadius: level('gulls') ? 4.6 + level('gulls') * 1.7 : 0,
+      shieldPerRound: level('bubble'),
+      cleanupThreshold: Math.max(3, 5 - level('burst')),
+      coconut: level('coconut'),
+    };
+    this.createSeagullHelpers();
+    this.updatePowerupChips();
+  }
+
+  createSeagullHelpers() {
+    for (const gull of this.seagulls) this.scene.remove(gull);
+    this.seagulls.length = 0;
+    const count = Math.min(6, this.mods?.gulls || 0);
+    for (let i = 0; i < count; i += 1) {
+      const gull = new THREE.Group();
+      const body = new THREE.Mesh(new THREE.SphereGeometry(0.2, 8, 6), toonMaterial(0xf8fbef));
+      body.scale.set(1.45, 0.7, 0.75);
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.13, 8, 6), toonMaterial(0xffffff));
+      head.position.set(0, 0.12, -0.25);
+      const beak = new THREE.Mesh(new THREE.ConeGeometry(0.055, 0.22, 5), toonMaterial(0xffc247));
+      beak.position.set(0, 0.1, -0.41);
+      beak.rotation.x = -Math.PI / 2;
+      const leftWing = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.7, 4), toonMaterial(0xe6edf1));
+      const rightWing = leftWing.clone();
+      leftWing.position.x = -0.32;
+      rightWing.position.x = 0.32;
+      leftWing.rotation.z = Math.PI / 2;
+      rightWing.rotation.z = -Math.PI / 2;
+      gull.add(body, head, beak, leftWing, rightWing);
+      gull.userData.leftWing = leftWing;
+      gull.userData.rightWing = rightWing;
+      gull.userData.phase = (i / Math.max(1, count)) * TAU;
+      this.scene.add(gull);
+      this.seagulls.push(gull);
+    }
+  }
+
+  updatePowerupChips() {
+    if (!dom.powerupList) return;
+    const permanent = POWERUPS
+      .filter((power) => this.upgrades?.[power.id])
+      .map((power) => `<span class="power-chip">${power.badge} ${this.upgrades[power.id]}</span>`);
+    const temporary = [];
+    if (this.temp?.double > 0) temporary.push('<span class="power-chip temp">2X</span>');
+    if (this.temp?.magnet > 0) temporary.push('<span class="power-chip temp">MAG+</span>');
+    if (this.temp?.turbo > 0) temporary.push('<span class="power-chip temp">TURBO</span>');
+    if (this.player?.shield > 0) temporary.push(`<span class="power-chip temp">SHIELD ${this.player.shield}</span>`);
+    dom.powerupList.innerHTML = [...permanent, ...temporary].join('');
+  }
+
+  finishRound() {
+    if (this.state !== 'playing') return;
+    this.state = 'upgrade';
+    const roundPoints = Math.max(0, Math.floor(this.player.score - this.roundScoreStart));
+    dom.roundReportTitle.textContent = `ROUND ${this.round} CLEANUP REPORT`;
+    dom.roundReport.textContent = `${this.roundCleaned} itens recolhidos • ${roundPoints.toLocaleString()} pontos • ${this.roundSewageHits} contatos com esgoto`;
+    dom.factText.textContent = LOCAL_FACTS[(this.round - 1) % LOCAL_FACTS.length];
+    this.renderPowerupChoices();
+    dom.upgrade.classList.add('active');
+    this.audio.tone(380, 0.12, 'square', 0.08, 220);
+    setTimeout(() => this.audio.tone(620, 0.18, 'triangle', 0.08, 260), 110);
+  }
+
+  renderPowerupChoices() {
+    const choices = [...POWERUPS].sort(() => Math.random() - 0.5).slice(0, 3);
+    dom.powerupChoices.replaceChildren();
+    for (const power of choices) {
+      const level = this.upgrades[power.id] || 0;
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'power-card';
+      button.innerHTML = `
+        <span class="power-card-badge">${power.badge}</span>
+        <h3>${power.name}</h3>
+        <p>${power.description}</p>
+        <span class="power-level">${level ? `LEVEL ${level} → ${level + 1}` : 'NEW POWERUP'}</span>
+      `;
+      button.addEventListener('click', () => this.choosePowerup(power.id), { once: true });
+      dom.powerupChoices.append(button);
+    }
+  }
+
+  choosePowerup(id) {
+    if (this.state !== 'upgrade') return;
+    this.upgrades[id] = (this.upgrades[id] || 0) + 1;
+    this.recalculateMods();
+    const power = powerupById(id);
+    this.round += 1;
+    this.audio.tone(720, 0.16, 'square', 0.09, 440);
+    this.beginRound();
+    this.showCallout(`${power.badge}: ${power.name.toUpperCase()}`);
+  }
+
+  createRock(x, z) {
+    const group = new THREE.Group();
+    const rock = new THREE.Mesh(
+      new THREE.DodecahedronGeometry(rand(1.15, 2.2), Math.random() > 0.75 ? 1 : 0),
+      toonMaterial(0x40515a),
+    );
+    rock.scale.y = rand(0.75, 1.35);
+    rock.rotation.set(rand(0, 1), rand(0, TAU), rand(0, 1));
+    addOutline(rock, 1.055, 0.76);
+    group.add(rock);
+    addCartoonEyes(group, [0, 0.55, 0.88], 1.25);
+    group.position.set(x, waveHeight(x, z, this.time) - 0.2, z);
+    group.userData.phase = rand(0, TAU);
+    group.traverse((child) => { if (child.isMesh) child.castShadow = true; });
+    this.scene.add(group);
+    this.obstacles.push({ mesh: group, radius: 1.25, kind: 'rock', phase: group.userData.phase });
+  }
+
+  createBuoy(x, z) {
+    const group = new THREE.Group();
+    const red = toonMaterial(0xff515e);
+    const white = toonMaterial(0xffffff);
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(0.52, 0.72, 1.5, 12), red);
+    base.position.y = 0.35;
+    const band = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.62, 0.35, 12), white);
+    band.position.y = 0.55;
+    const top = new THREE.Mesh(new THREE.SphereGeometry(0.28, 10, 8), red);
+    top.position.y = 1.35;
+    for (const mesh of [base, band, top]) addOutline(mesh, 1.055, 0.7);
+    group.add(base, band, top);
+    addCartoonEyes(group, [0, 0.72, 0.62], 1.05);
+    group.position.set(x, waveHeight(x, z, this.time), z);
+    group.userData.phase = rand(0, TAU);
+    group.traverse((child) => { if (child.isMesh) child.castShadow = true; });
+    this.scene.add(group);
+    this.obstacles.push({ mesh: group, radius: 0.95, kind: 'buoy', phase: group.userData.phase });
+  }
+
+  createPickup(x, z) {
+    const material = new THREE.MeshStandardMaterial({
+      color: 0xffef64,
+      emissive: 0xd77d00,
+      emissiveIntensity: 0.55,
+      roughness: 0.28,
+      metalness: 0.2,
+    });
+    const mesh = new THREE.Mesh(new THREE.TorusGeometry(0.68, 0.16, 10, 24), material);
+    mesh.position.set(x, waveHeight(x, z, this.time) + 1.45, z);
+    mesh.rotation.x = Math.PI / 2;
+    mesh.castShadow = true;
+    this.scene.add(mesh);
+    this.pickups.push({ mesh, radius: 1.05, phase: Math.random() * TAU });
+  }
+
+  createTrash(x, z, forcedKind = null) {
+    const kind = forcedKind || ['bottle', 'can', 'bag', 'tire', 'foam'][Math.floor(Math.random() * 5)];
+    const group = new THREE.Group();
+
+    if (kind === 'bottle') {
+      const body = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.25, 1.15, 10), toonMaterial(0x6dcbb5, { transparent: true, opacity: 0.78 }));
+      body.rotation.z = Math.PI / 2 + rand(-0.2, 0.2);
+      addOutline(body, 1.07, 0.55);
+      const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.2, 8), toonMaterial(0xe34f3c));
+      cap.rotation.z = Math.PI / 2;
+      cap.position.x = 0.67;
+      group.add(body, cap);
+      addCartoonEyes(group, [0.05, 0.13, 0.23], 0.86);
+    } else if (kind === 'can') {
+      const can = new THREE.Mesh(new THREE.CylinderGeometry(0.29, 0.29, 0.74, 12), toonMaterial(Math.random() > 0.5 ? 0xd53e36 : 0xe4dfcb));
+      can.rotation.z = Math.PI / 2;
+      addOutline(can, 1.07, 0.72);
+      group.add(can);
+      addCartoonEyes(group, [0, 0.12, 0.3], 0.9);
+    } else if (kind === 'bag') {
+      const bag = new THREE.Mesh(new THREE.PlaneGeometry(1.25, 1.05, 3, 3), toonMaterial(0xf1eef4, { transparent: true, opacity: 0.72, side: THREE.DoubleSide }));
+      const positions = bag.geometry.attributes.position;
+      for (let i = 0; i < positions.count; i += 1) positions.setZ(i, rand(-0.18, 0.18));
+      bag.geometry.computeVertexNormals();
+      bag.rotation.x = -Math.PI / 2;
+      group.add(bag);
+      addCartoonEyes(group, [0, 0.17, 0.34], 0.95);
+    } else if (kind === 'tire') {
+      const tire = new THREE.Mesh(new THREE.TorusGeometry(0.62, 0.2, 10, 20), toonMaterial(0x181b1a));
+      tire.rotation.x = Math.PI / 2;
+      addOutline(tire, 1.06, 0.8);
+      group.add(tire);
+      addCartoonEyes(group, [0, 0.18, 0.58], 1.05);
+    } else {
+      const foam = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.36, 0.75), toonMaterial(0xede8d8));
+      foam.rotation.y = rand(-0.5, 0.5);
+      addOut
