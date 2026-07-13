@@ -1,0 +1,19 @@
+{
+  "name": "Swell Runner: João Pessoa",
+  "short_name": "Swell Runner JP",
+  "description": "A mobile-friendly Three.js arcade surfing game set along a stylized João Pessoa shoreline.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#061629",
+  "theme_color": "#061629",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
