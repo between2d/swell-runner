@@ -62,8 +62,6 @@ function aplicarEscalaInteira(forcar = false) {
   prepararContexto(escala);
 }
 
-aplicarEscalaInteira(true);
-
 try {
   const partes = await Promise.all(
     Array.from({ length: quantidadeDePartes }, (_, indice) =>
@@ -83,11 +81,11 @@ try {
 
   const fluxo = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
   const codigo = await new Response(fluxo).text();
-  Function(`'use strict';\n${codigo}`)();
 
-  // O runtime cria seu contexto próprio. Reaplicamos a transformação antes
-  // do primeiro requestAnimationFrame desenhar a cena.
-  prepararContexto(escalaAtual);
+  // O runtime sempre nasce na grade lógica declarada no HTML. Só depois de
+  // ele criar seus estados e contexto ampliamos o backing store para 2x, 3x…
+  Function(`'use strict';\n${codigo}`)();
+  aplicarEscalaInteira(true);
 } catch (erro) {
   console.error(erro);
   if (carregando) carregando.textContent = 'A MARÉ NÃO CARREGOU. ATUALIZE O NAVEGADOR.';
