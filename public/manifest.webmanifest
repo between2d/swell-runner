@@ -1,13 +1,13 @@
 {
-  "name": "Swell Runner: João Pessoa",
-  "short_name": "Swell Runner JP",
-  "description": "A mobile-friendly Three.js arcade surfing game set along a stylized João Pessoa shoreline.",
+  "name": "Maré Limpa JP",
+  "short_name": "Maré Limpa JP",
+  "description": "Jogo 2D em pixel art sobre surfe, lixo, óleo e esgoto em João Pessoa.",
   "start_url": "./",
   "scope": "./",
   "display": "fullscreen",
   "orientation": "any",
-  "background_color": "#061629",
-  "theme_color": "#061629",
+  "background_color": "#101521",
+  "theme_color": "#101521",
   "icons": [
     {
       "src": "./icon.svg",
