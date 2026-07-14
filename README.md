@@ -1,35 +1,36 @@
 # Maré Limpa JP
 
-Jogo 2D em pixel art sobre surfe, lixo e poluição nas praias e rios urbanos de João Pessoa.
+Jogo 2D em pixel art sobre surfe, lixo, óleo e esgoto nas praias e rios urbanos de João Pessoa.
 
-## Direção atual
+## Jogabilidade atual
 
-A versão pública foi reconstruída como um jogo lateral em baixa resolução, com arte original feita diretamente no Canvas 2D. A versão anterior em Three.js está preservada na branch `arquivo-versao-3d`.
+O jogador não anda livremente sobre um chão azul. O direcional escolhe para onde a prancha tenta apontar, mas ela gira gradualmente e conserva velocidade e inércia.
 
-Referências de linguagem e ritmo: jogos clássicos de surfe em visão lateral e jogos modernos feitos com PICO-8. Nenhum sprite ou código dessas referências foi copiado.
-
-## Como jogar
-
-- **Esquerda / direita:** mover na onda
-- **Espaço / seta para cima:** pular
-- **E:** denunciar um ponto de esgoto quando estiver na borda segura
+- **Direcional / WASD:** orientar a prancha em quatro direções
+- **Shift / CURVA:** fazer curva mais fechada, perdendo velocidade
+- **Espaço / PULAR:** saltar ao alcançar a crista com embalo
+- **F / FLOW:** gastar Flow para acelerar
+- **E / DENÚNCIA:** registrar óleo ou esgoto pela borda segura
 - **P / Esc:** pausar
 
-No celular, use os botões na tela.
+Descer a parede da onda aumenta a velocidade. Subir consome embalo. A espuma, o tubo e as curvas perto da parte quebrando dão mais pontos, mas aumentam o risco. O jogo detecta cutbacks, 360 graus, saltos, giros no ar, pousos e tempo no tubo.
 
 ## Estrutura
 
-- Rodadas de 30 segundos
-- Três poderes aleatórios ao fim de cada rodada
-- Lixo recolhido rende pontos e combo
-- Pontos de esgoto podem ser denunciados
-- Obstáculos e contato com esgoto removem vidas
-- Cenário inspirado de forma estilizada na orla de João Pessoa
+- Rodadas de 40 segundos
+- Missões de lixo recolhido e pontos aéreos
+- Três poderes aleatórios após cada rodada
+- Flow, combo, barra de Ação e bônus temporários
+- Manchas e eventos de óleo e esgoto
+- Lixo, nadadores, pedras e tubarões desenhados com silhuetas e rótulos legíveis
+- Poderes herdados da versão anterior: gaivotas, tubarão reciclador, drone, rede, prancha pipoca, saco sem fundo, bloco, ímã, escudo, mutirão e outros
 - Interface e textos integralmente em português
 
 ## Referência ambiental
 
 O jogo toma o Movimento Esgotei como referência local de mobilização e linguagem. É um projeto independente e não representa parceria oficial. Para decidir sobre banho de mar, consulte sempre os boletins oficiais de balneabilidade.
+
+A versão pixel anterior está preservada na branch `arquivo-pixel-v1`. A versão Three.js está na branch `arquivo-versao-3d`.
 
 ## Desenvolvimento
 
@@ -38,10 +39,6 @@ npm install
 npm run dev
 ```
 
-## Produção
-
 ```bash
 npm run build
 ```
-
-GitHub Pages é publicado automaticamente pela workflow em `.github/workflows/deploy.yml`.
