@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#101521" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="description" content="Maré Limpa JP, jogo pixel art sobre surfe, lixo e poluição em João Pessoa." />
+  <meta name="description" content="Maré Limpa JP, jogo pixel art sobre surfe, lixo, óleo e esgoto em João Pessoa." />
   <link rel="manifest" href="./manifest.webmanifest" />
   <link rel="icon" href="./icon.svg" type="image/svg+xml" />
   <title>Maré Limpa JP</title>
@@ -19,13 +19,17 @@
     </section>
 
     <section id="controles-mobile" aria-label="Controles do jogo">
-      <div class="grupo direcao">
-        <button type="button" data-acao="esquerda" aria-label="Ir para a esquerda">◀</button>
-        <button type="button" data-acao="direita" aria-label="Ir para a direita">▶</button>
+      <div class="dpad" aria-label="Orientar a prancha">
+        <button type="button" class="cima" data-acao="cima" aria-label="Apontar para cima">▲</button>
+        <button type="button" class="esquerda" data-acao="esquerda" aria-label="Apontar para a esquerda">◀</button>
+        <button type="button" class="baixo" data-acao="baixo" aria-label="Apontar para baixo">▼</button>
+        <button type="button" class="direita" data-acao="direita" aria-label="Apontar para a direita">▶</button>
       </div>
       <div class="grupo acoes">
-        <button type="button" class="denuncia" data-acao="denunciar" aria-label="Denunciar ponto de esgoto">!</button>
-        <button type="button" class="pulo" data-acao="pular" aria-label="Pular">PULAR</button>
+        <button type="button" class="curva" data-acao="curva" aria-label="Fazer curva fechada">CURVA</button>
+        <button type="button" class="flow" data-acao="flow" aria-label="Usar Flow">FLOW</button>
+        <button type="button" class="denuncia" data-acao="denunciar" aria-label="Denunciar mancha de óleo ou esgoto">!</button>
+        <button type="button" class="pulo" data-acao="pular" aria-label="Pular na crista">PULAR</button>
       </div>
     </section>
 
