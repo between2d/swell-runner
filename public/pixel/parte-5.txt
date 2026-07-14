@@ -1,0 +1,141 @@
+      desenharGaivota(this.jogador.x - 25 + i * 14, this.jogador.y - 31 - (i % 2) * 5, this.tempo, i);
+    }
+
+    if (this.jogador.invencivel <= 0 || Math.floor(this.jogador.invencivel * 10) % 2 === 0) {
+      desenharSurfista(this.jogador, this.tempo, this.mod.saco ? this.temporizadores.saco : 0);
+    }
+
+    if (this.jogador.escudo > 0) {
+      ctx.strokeStyle = COR.azulCeu;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(inteiro(this.jogador.x - 15), inteiro(this.jogador.y - 20), 30, 34);
+    }
+
+    for (const p of this.particulas) ret(p.x, p.y, p.vida > .3 ? 2 : 1, p.vida > .3 ? 2 : 1, p.cor);
+
+    this.desenharHud();
+    if (this.mod.farol) this.desenharAlerta();
+    if (this.tempoMensagem > 0) {
+      caixa(42, 38, 236, 18, COR.preto, COR.amarelo);
+      texto(this.mensagem, 160, 44, COR.claro, 8, 'center');
+    }
+
+    if (this.estado === 'menu') this.desenharMenu();
+    else if (this.estado === 'escolha') this.desenharEscolha();
+    else if (this.estado === 'fim') this.desenharFim();
+    else if (this.estado === 'pausa') this.desenharPausa();
+  }
+
+  desenharHud() {
+    ret(0, 0, W, 17, COR.preto);
+    texto(`PONTOS ${Math.floor(this.jogador.pontos).toString().padStart(6, '0')}`, 5, 4, COR.claro, 7);
+    texto(`LIXO ${this.jogador.lixo}`, 100, 4, COR.verde, 7);
+    texto(`DEN ${this.jogador.denuncias}`, 159, 4, COR.vermelho, 7);
+    texto(`R${this.rodada}`, 217, 4, COR.amarelo, 7);
+    texto(`${Math.max(0, Math.ceil(this.tempoRodada)).toString().padStart(2, '0')}s`, 257, 3, this.tempoRodada < 6 ? COR.vermelho : COR.claro, 9);
+    texto('♥'.repeat(Math.max(0, this.jogador.vidas)), 315, 4, COR.rosa, 7, 'right');
+
+    if (this.jogador.multiplicador > 1) texto(`COMBO x${this.jogador.multiplicador.toFixed(2)}`, 6, 21, COR.amarelo, 7);
+    const ativos = PODERES.filter((p) => this.nivel(p.id)).slice(0, 5);
+    ativos.forEach((p, i) => texto(`${p.sigla}${this.nivel(p.id)}`, 317 - i * 33, 21, COR.claro, 6, 'right'));
+  }
+
+  desenharAlerta() {
+    const perigos = [
+      ...this.obstaculos.map((o) => ({ x: o.x, tipo: '!' })),
+      ...this.esgotos.filter((e) => !e.denunciado).map((e) => ({ x: e.x, tipo: 'E' })),
+    ].filter((p) => p.x > this.jogador.x);
+    perigos.sort((a, b) => a.x - b.x);
+    const alvo = perigos[0];
+    if (!alvo || alvo.x > W + 80) return;
+    const x = limitar(alvo.x, 15, W - 15);
+    ret(x - 5, 28, 10, 8, COR.amarelo);
+    texto(alvo.tipo, x, 29, COR.preto, 7, 'center');
+    ret(x - 1, 36, 3, 4, COR.amarelo);
+  }
+
+  desenharMenu() {
+    ret(0, 0, W, H, 'rgba(16,21,33,.72)');
+    caixa(24, 20, 272, 142, COR.noite, COR.claro);
+    ret(37, 31, 246, 13, COR.preto);
+    texto('EU ESGOTEI. NÓS ESGOTAMOS.', 160, 34, COR.claro, 8, 'center');
+    texto('MARÉ', 160, 50, COR.amarelo, 22, 'center');
+    texto('LIMPA JP', 160, 72, COR.rosa, 20, 'center');
+    texto('SURFE • LIMPE • DENUNCIE', 160, 98, COR.verde, 8, 'center');
+    caixa(83, 113, 154, 27, COR.azulFundo, COR.amarelo);
+    texto('COMEÇAR', 160, 121, COR.claro, 11, 'center');
+    texto('← → mover  •  ESPAÇO pular  •  E denunciar', 160, 145, COR.claro, 6, 'center');
+    texto('Projeto independente. Referência: Movimento Esgotei.', 160, 154, COR.cinza, 5, 'center');
+  }
+
+  desenharEscolha() {
+    ret(0, 0, W, H, COR.preto);
+    texto(`RODADA ${this.rodada} CONCLUÍDA`, 160, 9, COR.verde, 9, 'center');
+    texto(`${this.lixoRodada} itens • ${this.denunciasRodada} denúncias • ${Math.floor(this.jogador.pontos - this.pontosInicioRodada)} pontos`, 160, 22, COR.claro, 6, 'center');
+    texto('ESCOLHA UMA BAGUNÇA', 160, 35, COR.amarelo, 11, 'center');
+
+    this.escolhas.forEach((poder, i) => {
+      const x = 8 + i * 104;
+      const cor = [COR.azulFundo, '#5b315e', '#285d50'][i];
+      caixa(x, 52, 96, 94, cor, i === 1 ? COR.rosa : COR.claro);
+      texto(poder.sigla, x + 48, 59, COR.amarelo, 11, 'center');
+      const nome = quebrarTexto(poder.nome.toUpperCase(), 15).slice(0, 2);
+      nome.forEach((linha, n) => texto(linha, x + 48, 75 + n * 8, COR.claro, 7, 'center'));
+      const desc = quebrarTexto(poder.desc, 20).slice(0, 5);
+      desc.forEach((linha, n) => texto(linha, x + 7, 96 + n * 7, '#d5d9e3', 5));
+      texto(this.nivel(poder.id) ? `NÍVEL ${this.nivel(poder.id)} → ${this.nivel(poder.id) + 1}` : 'NOVO', x + 48, 135, COR.verde, 6, 'center');
+    });
+
+    ret(12, 153, 296, 18, COR.noite);
+    texto(FATOS[(this.rodada - 1) % FATOS.length], 160, 157, COR.claro, 5, 'center');
+  }
+
+  desenharFim() {
+    ret(0, 0, W, H, 'rgba(16,21,33,.82)');
+    caixa(55, 31, 210, 119, COR.noite, COR.vermelho);
+    texto('A ONDA VENCEU', 160, 43, COR.vermelho, 13, 'center');
+    texto(`PONTOS ${Math.floor(this.jogador.pontos)}`, 160, 69, COR.claro, 9, 'center');
+    texto(`LIXO RECOLHIDO ${this.jogador.lixo}`, 160, 85, COR.verde, 7, 'center');
+    texto(`DENÚNCIAS ${this.jogador.denuncias}`, 160, 97, COR.amarelo, 7, 'center');
+    texto(`RECORDE ${this.recorde}`, 160, 111, COR.rosa, 8, 'center');
+    caixa(91, 126, 138, 18, COR.azulFundo, COR.claro);
+    texto('TENTAR DE NOVO', 160, 131, COR.claro, 8, 'center');
+  }
+
+  desenharPausa() {
+    ret(0, 0, W, H, 'rgba(16,21,33,.75)');
+    caixa(93, 67, 134, 45, COR.noite, COR.amarelo);
+    texto('PAUSADO', 160, 77, COR.amarelo, 13, 'center');
+    texto('P ou ESC para voltar', 160, 97, COR.claro, 6, 'center');
+  }
+
+  clique(x, y) {
+    som.iniciar();
+    if (this.estado === 'menu' && x >= 83 && x <= 237 && y >= 113 && y <= 140) this.iniciar();
+    else if (this.estado === 'fim' && x >= 91 && x <= 229 && y >= 126 && y <= 144) this.iniciar();
+    else if (this.estado === 'escolha' && y >= 52 && y <= 146) {
+      const indice = Math.floor((x - 8) / 104);
+      if (indice >= 0 && indice < 3) this.escolherPoder(indice);
+    }
+  }
+
+  loop(agora) {
+    const dt = Math.min(.033, (agora - this.ultimo) / 1000);
+    this.ultimo = agora;
+    this.atualizar(dt);
+    this.desenhar();
+    apertou.clear();
+    requestAnimationFrame(this.loop);
+  }
+}
+
+const jogo = new Jogo();
+
+tela.addEventListener('pointerdown', (evento) => {
+  const r = tela.getBoundingClientRect();
+  const x = (evento.clientX - r.left) * W / r.width;
+  const y = (evento.clientY - r.top) * H / r.height;
+  jogo.clique(x, y);
+});
+
+document.querySelector('#carregando').classList.add('oculto');
