@@ -1,0 +1,126 @@
+
+const funUpdateObjects = Game.prototype.updateObjects;
+Game.prototype.updateObjects = function updateFunObjects(dt) {
+  ensureFunChaos(this);
+  if (this.mods.parade > 0) {
+    const beat = Math.floor(this.time * (2.2 + this.mods.parade * 0.12));
+    const pulse = Math.max(0, Math.sin(this.time * (6.2 + this.mods.parade * 0.35)));
+    for (const item of this.pollution) {
+      if (item.kind !== 'trash') continue;
+      item.mesh.position.x += Math.sin(this.time * 5.4 + item.phase) * dt * (0.8 + this.mods.parade * 0.35);
+      item.mesh.position.x = lerp(item.mesh.position.x, this.player.x, dt * pulse * (0.16 + this.mods.parade * 0.08));
+      item.mesh.position.y += pulse * 0.05;
+    }
+    if (beat !== this.chaos.paradeBeat) {
+      this.chaos.paradeBeat = beat;
+      if (beat % 4 === 0) this.audio.tone(180 + (beat % 3) * 70, 0.06, 'square', 0.025, 80);
+    }
+  }
+  funUpdateObjects.call(this, dt);
+};
+
+const funUpdateHelpers = Game.prototype.updateHelpers;
+Game.prototype.updateHelpers = function updateFunHelpers(dt) {
+  funUpdateHelpers.call(this, dt);
+  ensureFunChaos(this);
+
+  if (this.gossipDrone) {
+    const phase = this.time * (1.4 + this.mods.drone * 0.06);
+    this.gossipDrone.position.set(
+      this.surfer.position.x + Math.cos(phase) * 2.3,
+      this.surfer.position.y + 3.1 + Math.sin(phase * 1.7) * 0.35,
+      this.playerZ + Math.sin(phase) * 1.5,
+    );
+    this.gossipDrone.rotation.y = -phase + Math.PI / 2;
+    for (const rotor of this.gossipDrone.userData.rotors || []) rotor.rotation.z += dt * 24;
+    this.gossipDrone.userData.lens.scale.setScalar(1 + Math.sin(this.time * 8) * 0.13);
+
+    if (this.state === 'playing') {
+      this.chaos.droneTimer -= dt;
+      if (this.chaos.droneTimer <= 0) {
+        let target = null;
+        let best = Infinity;
+        for (const item of this.pollution) {
+          if (item.kind !== 'sewage' || item.reported) continue;
+          const distance = Math.hypot(item.mesh.position.x - this.player.x, item.mesh.position.z - this.playerZ);
+          if (distance < best && item.mesh.position.z < 24 && item.mesh.position.z > -95) {
+            best = distance;
+            target = item;
+          }
+        }
+        if (target) {
+          esgoteiReportSewage.call(this, target);
+          this.showCallout('DRONE DEDUREBA: PONTO FLAGRADO');
+        }
+        this.chaos.droneTimer = Math.max(3.3, 10 - this.mods.drone * 1.35);
+      }
+    }
+  }
+
+  if (this.recyclerShark) {
+    const phase = this.time * 1.8;
+    this.recyclerShark.position.set(
+      this.surfer.position.x + Math.sin(phase) * (2.5 + this.mods.shark * 0.18),
+      waveHeight(this.player.x, this.playerZ + 1.5, this.time) - 0.38 + Math.sin(phase * 2) * 0.12,
+      this.playerZ + 1.8 + Math.cos(phase) * 1.5,
+    );
+    this.recyclerShark.rotation.y = Math.sin(phase) * 0.32 + Math.PI;
+    this.recyclerShark.userData.tail.rotation.z = Math.sin(this.time * 12) * 0.55;
+
+    if (this.state === 'playing') {
+      this.chaos.sharkTimer -= dt;
+      if (this.chaos.sharkTimer <= 0) {
+        let targetIndex = -1;
+        let best = 18 + this.mods.shark * 5;
+        for (let i = 0; i < this.pollution.length; i += 1) {
+          const item = this.pollution[i];
+          if (item.kind !== 'trash') continue;
+          const distance = Math.hypot(item.mesh.position.x - this.player.x, item.mesh.position.z - this.playerZ);
+          if (distance < best) {
+            best = distance;
+            targetIndex = i;
+          }
+        }
+        if (targetIndex >= 0) {
+          this.collectTrash(this.pollution[targetIndex], targetIndex, 'SHARK');
+          this.showCallout('TUBARÃO DA RECICLAGEM: NHAC');
+        }
+        this.chaos.sharkTimer = Math.max(1.15, 3.8 - this.mods.shark * 0.42);
+      }
+    }
+  }
+
+  if (this.mods.net > 0 && this.state === 'playing') {
+    this.chaos.netTimer -= dt;
+    if (this.chaos.netTimer <= 0) {
+      this.fireMutiraoNet();
+      this.chaos.netTimer = Math.max(4.2, 13 - this.mods.net * 1.45);
+    }
+  }
+};
+
+const funUpdateEffects = Game.prototype.updateEffects;
+Game.prototype.updateEffects = function updateFunEffects(dt) {
+  funUpdateEffects.call(this, dt);
+  ensureFunChaos(this);
+  for (let i = this.chaosVisuals.length - 1; i >= 0; i -= 1) {
+    const visual = this.chaosVisuals[i];
+    visual.life -= dt;
+    const progress = 1 - visual.life / visual.maxLife;
+    if (visual.kind === 'ring') {
+      visual.mesh.scale.setScalar(0.15 + progress * 0.95);
+      visual.mesh.material.opacity = Math.max(0, 0.82 * (1 - progress));
+    } else if (visual.kind === 'net') {
+      visual.mesh.position.z += dt * 68;
+      visual.mesh.position.y = waveHeight(visual.mesh.position.x, visual.mesh.position.z, this.time) + 1.1;
+      for (const child of visual.mesh.children) child.material.opacity = Math.max(0, 0.72 * (1 - progress));
+    }
+    if (visual.life <= 0) {
+      visual.mesh.parent?.remove(visual.mesh);
+      this.chaosVisuals.splice(i, 1);
+    }
+  }
+};
+
+ensureFunChaos(game);
+game.recalculateMods();
