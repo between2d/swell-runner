@@ -1,0 +1,93 @@
+};
+
+Game.prototype.fireMutiraoNet = function fireMutiraoNet() {
+  const level = this.mods.net;
+  if (!level) return;
+  const targetCount = 2 + level;
+  let collected = 0;
+  for (let pass = 0; pass < targetCount; pass += 1) {
+    let bestIndex = -1;
+    let bestDistance = Infinity;
+    for (let i = 0; i < this.pollution.length; i += 1) {
+      const item = this.pollution[i];
+      if (item.kind !== 'trash' || item.mesh.position.z > 25 || item.mesh.position.z < -105) continue;
+      const distance = Math.hypot(item.mesh.position.x - this.player.x, item.mesh.position.z - this.playerZ);
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        bestIndex = i;
+      }
+    }
+    if (bestIndex < 0) break;
+    this.collectTrash(this.pollution[bestIndex], bestIndex, 'NET');
+    collected += 1;
+  }
+  this.addNetSweepVisual();
+  if (collected > 0) {
+    this.showCallout(`REDE DO MUTIRÃO: ${collected} ITENS`);
+    this.audio.tone(240, 0.14, 'square', 0.07, 460);
+  }
+};
+
+Game.prototype.popcornLanding = function popcornLanding() {
+  const level = this.mods.popcorn;
+  if (!level) return;
+  const radius = 4.8 + level * 2.2;
+  let cleaned = 0;
+  for (let i = this.pollution.length - 1; i >= 0; i -= 1) {
+    const item = this.pollution[i];
+    if (item.kind !== 'trash') continue;
+    const distance = Math.hypot(item.mesh.position.x - this.player.x, item.mesh.position.z - this.playerZ);
+    if (distance < radius && cleaned < 1 + level * 2) {
+      this.collectTrash(item, i, 'POPCORN');
+      cleaned += 1;
+    }
+  }
+  let bounced = 0;
+  for (const obstacle of this.obstacles) {
+    const dx = obstacle.mesh.position.x - this.player.x;
+    const dz = obstacle.mesh.position.z - this.playerZ;
+    const distance = Math.hypot(dx, dz);
+    if (distance < radius) {
+      obstacle.mesh.position.x = clamp(obstacle.mesh.position.x + (dx >= 0 ? 1 : -1) * (5 + level * 1.6), -30, 30);
+      obstacle.mesh.position.z -= 5 + level * 1.2;
+      obstacle.mesh.rotation.z += (dx >= 0 ? 1 : -1) * 0.8;
+      bounced += 1;
+    }
+  }
+  this.addChaosRing(radius, 0xff6bb5);
+  this.cameraShake = Math.max(this.cameraShake, 0.16);
+  this.audio.tone(120, 0.15, 'square', 0.08, 520);
+  if (cleaned || bounced) this.showCallout(`PRANCHA PIPOCA: ${cleaned} LIXOS • ${bounced} TRETAS`);
+};
+
+const funUpdatePlayer = Game.prototype.updatePlayer;
+Game.prototype.updatePlayer = function updateFunPlayer(dt) {
+  const wasGrounded = this.player.grounded;
+  const previousHeight = this.player.jumpY;
+  funUpdatePlayer.call(this, dt);
+  if (!wasGrounded && this.player.grounded && previousHeight > 0.08 && this.state === 'playing') this.popcornLanding();
+  this.updateBagVisual();
+};
+
+const funCollectTrash = Game.prototype.collectTrash;
+Game.prototype.collectTrash = function collectTrashWithFun(item, index, source = 'SURF') {
+  const before = this.player.cleaned;
+  funCollectTrash.call(this, item, index, source);
+  if (this.player.cleaned <= before || !this.mods.bag) return;
+  ensureFunChaos(this);
+  this.chaos.bagStash += 1;
+  this.updateBagVisual();
+  if (this.chaos.bagStash < this.mods.bagCapacity) return;
+
+  const bonus = Math.floor((420 + this.mods.bag * 180) * this.player.multiplier);
+  this.player.score += bonus;
+  this.player.flow = clamp(this.player.flow + 22 + this.mods.bag * 5, 0, 100);
+  this.chaos.bagStash = 0;
+  this.updateBagVisual();
+  const position = this.surfer.position.clone();
+  position.y += 1.6;
+  this.createBurst(position, [0x6d4a83, 0xffef64, 0x75f0a1, 0xff6bb5], 22);
+  this.showCallout(`SACO SEM FUNDO ESTOUROU +${bonus}`);
+  this.audio.tone(180, 0.16, 'sawtooth', 0.08, 760);
+  navigator.vibrate?.([20, 25, 35]);
+};
