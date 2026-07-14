@@ -1,0 +1,220 @@
+
+const tela = document.querySelector('#jogo');
+const ctx = tela.getContext('2d', { alpha: false });
+ctx.imageSmoothingEnabled = false;
+
+const W = 320;
+const H = 180;
+const TAU = Math.PI * 2;
+const DURACAO_RODADA = 30;
+
+const COR = {
+  preto: '#101521',
+  noite: '#1b2033',
+  cinza: '#596174',
+  claro: '#fff7d6',
+  branco: '#ffffff',
+  amarelo: '#ffd84a',
+  laranja: '#ff9f45',
+  rosa: '#ff5d9e',
+  vermelho: '#e43b4f',
+  pele: '#f3a66d',
+  cabelo: '#4c2b36',
+  verde: '#65d47b',
+  verdeEscuro: '#287a56',
+  azulCeu: '#38bdf8',
+  azulMar: '#1274b8',
+  azulFundo: '#113e78',
+  espuma: '#eafcff',
+  esgoto: '#5d5a24',
+  esgotoEscuro: '#34351d',
+  areia: '#e6b66b',
+  barro: '#ad573e',
+};
+
+const FATOS = [
+  'EU ESGOTEI. NÓS ESGOTAMOS. O nome fala do esgoto e do limite da paciência.',
+  'DENÚNCIA + AÇÃO AMBIENTAL. Registrar o problema é o começo, não o fim.',
+  'RIOS SEM ESGOTO. A praia também depende dos canais, maceiós e rios urbanos.',
+  'DEPOIS DA CHUVA, lixo e contaminação podem ser carregados para o mar.',
+  'ÁGUA BONITA NÃO É LAUDO. Consulte os boletins oficiais antes de entrar.',
+  'RECOLHER LIXO AJUDA. Saneamento e fiscalização continuam sendo dever público.',
+];
+
+const PODERES = [
+  { id: 'gaivotas', sigla: 'GAV', nome: 'Gaivotas Sindicalizadas', desc: 'Uma equipe de gaivotas recolhe lixo próximo. Cada nível chama mais uma trabalhadora.' },
+  { id: 'tubarao', sigla: 'NHAC', nome: 'Tubarão da Reciclagem', desc: 'Um tubarão ambientalista abocanha lixo. Pneus incluídos, biologia excluída.' },
+  { id: 'drone', sigla: 'DRN', nome: 'Drone Dedureba', desc: 'Denuncia automaticamente pontos de esgoto que aparecem na tela.' },
+  { id: 'rede', sigla: 'REDE', nome: 'Rede do Mutirão', desc: 'Uma rede atravessa a onda periodicamente e recolhe vários itens.' },
+  { id: 'pipoca', sigla: 'POC', nome: 'Prancha Pipoca', desc: 'Cada aterrissagem cria uma explosão de limpeza e empurra obstáculos.' },
+  { id: 'saco', sigla: 'SACO', nome: 'Saco Sem Fundo', desc: 'O saco cresce nas costas e estoura em pontos quando fica cheio.' },
+  { id: 'bloco', sigla: 'BLO', nome: 'Bloco da Maré Limpa', desc: 'O lixo dança em direção à prancha. Até a garrafa PET entra no passo.' },
+  { id: 'caldo', sigla: 'TUR', nome: 'Caldo de Cana Turbo', desc: 'Aumenta a velocidade e a pontuação por distância. Açúcar com responsabilidade.' },
+  { id: 'pranchao', sigla: 'BIG', nome: 'Pranchão de Tambaú', desc: 'Prancha maior, área de coleta maior e dignidade menor.' },
+  { id: 'bolha', sigla: 'POP', nome: 'Bolha Biodegradável', desc: 'Comece cada rodada protegido contra um impacto ou banho de esgoto.' },
+  { id: 'farol', sigla: 'FAR', nome: 'Farol do Cabo Branco', desc: 'Uma seta avisa o perigo mais próximo antes de ele chegar.' },
+  { id: 'mutirao', sigla: 'MUT', nome: 'Mutirão Relâmpago', desc: 'Cada rodada começa com mais lixo para recolher e um bônus de combo.' },
+];
+
+const TIPOS_LIXO = ['garrafa', 'lata', 'sacola', 'pneu', 'isopor'];
+const VALOR_LIXO = { garrafa: 100, lata: 90, sacola: 130, pneu: 190, isopor: 80 };
+
+const teclas = new Set();
+const apertou = new Set();
+
+const MAPA_TECLAS = {
+  ArrowLeft: 'esquerda', KeyA: 'esquerda',
+  ArrowRight: 'direita', KeyD: 'direita',
+  Space: 'pular', ArrowUp: 'pular', KeyW: 'pular',
+  KeyE: 'denunciar',
+  KeyP: 'pausar', Escape: 'pausar',
+};
+
+window.addEventListener('keydown', (evento) => {
+  const acao = MAPA_TECLAS[evento.code];
+  if (!acao) return;
+  evento.preventDefault();
+  if (!teclas.has(acao)) apertou.add(acao);
+  teclas.add(acao);
+});
+window.addEventListener('keyup', (evento) => {
+  const acao = MAPA_TECLAS[evento.code];
+  if (!acao) return;
+  evento.preventDefault();
+  teclas.delete(acao);
+});
+window.addEventListener('blur', () => teclas.clear());
+
+function segurando(acao) { return teclas.has(acao); }
+function consumiu(acao) {
+  if (!apertou.has(acao)) return false;
+  apertou.delete(acao);
+  return true;
+}
+
+for (const botao of document.querySelectorAll('[data-acao]')) {
+  const acao = botao.dataset.acao;
+  const ativar = (evento) => {
+    evento.preventDefault();
+    if (!teclas.has(acao)) apertou.add(acao);
+    teclas.add(acao);
+    botao.classList.add('ativo');
+    botao.setPointerCapture?.(evento.pointerId);
+    navigator.vibrate?.(8);
+  };
+  const desativar = (evento) => {
+    evento.preventDefault();
+    teclas.delete(acao);
+    botao.classList.remove('ativo');
+  };
+  botao.addEventListener('pointerdown', ativar);
+  botao.addEventListener('pointerup', desativar);
+  botao.addEventListener('pointercancel', desativar);
+}
+
+class Som8Bits {
+  constructor() {
+    this.contexto = null;
+    this.ligado = true;
+  }
+  iniciar() {
+    if (!this.contexto) this.contexto = new (window.AudioContext || window.webkitAudioContext)();
+    this.contexto?.resume();
+  }
+  tom(frequencia = 440, duracao = .08, tipo = 'square', volume = .035, deslize = 0) {
+    if (!this.ligado || !this.contexto) return;
+    const agora = this.contexto.currentTime;
+    const oscilador = this.contexto.createOscillator();
+    const ganho = this.contexto.createGain();
+    oscilador.type = tipo;
+    oscilador.frequency.setValueAtTime(frequencia, agora);
+    if (deslize) oscilador.frequency.linearRampToValueAtTime(Math.max(40, frequencia + deslize), agora + duracao);
+    ganho.gain.setValueAtTime(volume, agora);
+    ganho.gain.exponentialRampToValueAtTime(.0001, agora + duracao);
+    oscilador.connect(ganho).connect(this.contexto.destination);
+    oscilador.start(agora);
+    oscilador.stop(agora + duracao);
+  }
+  coleta() { this.tom(680, .06, 'square', .035, 300); }
+  pulo() { this.tom(190, .12, 'triangle', .05, 240); }
+  impacto() { this.tom(90, .22, 'sawtooth', .055, -25); }
+  premio() { this.tom(420, .09, 'square', .04, 480); setTimeout(() => this.tom(760, .08, 'triangle', .03, 180), 75); }
+}
+
+const som = new Som8Bits();
+const botaoSom = document.querySelector('#botao-som');
+botaoSom.addEventListener('click', () => {
+  som.iniciar();
+  som.ligado = !som.ligado;
+  botaoSom.textContent = `SOM: ${som.ligado ? 'LIGADO' : 'DESLIGADO'}`;
+});
+
+document.querySelector('#botao-tela').addEventListener('click', async () => {
+  try {
+    if (!document.fullscreenElement) await document.documentElement.requestFullscreen?.();
+    else await document.exitFullscreen?.();
+  } catch {}
+});
+
+function inteiro(n) { return Math.round(n); }
+function limitar(v, a, b) { return Math.max(a, Math.min(b, v)); }
+function aleatorio(a, b) { return a + Math.random() * (b - a); }
+function escolher(lista) { return lista[Math.floor(Math.random() * lista.length)]; }
+function embaralhar(lista) { return [...lista].sort(() => Math.random() - .5); }
+function colisao(a, b, raio) { return Math.hypot(a.x - b.x, a.y - b.y) < raio; }
+
+function ret(x, y, w, h, cor) {
+  ctx.fillStyle = cor;
+  ctx.fillRect(inteiro(x), inteiro(y), inteiro(w), inteiro(h));
+}
+
+function texto(txt, x, y, cor = COR.claro, tamanho = 8, alinhar = 'left') {
+  ctx.fillStyle = cor;
+  ctx.font = `900 ${tamanho}px "Courier New", monospace`;
+  ctx.textAlign = alinhar;
+  ctx.textBaseline = 'top';
+  ctx.fillText(txt, inteiro(x), inteiro(y));
+}
+
+function caixa(x, y, w, h, cor = COR.noite, borda = COR.claro) {
+  ret(x, y, w, h, COR.preto);
+  ret(x + 2, y + 2, w - 4, h - 4, borda);
+  ret(x + 4, y + 4, w - 8, h - 8, cor);
+}
+
+function quebrarTexto(txt, largura) {
+  const palavras = txt.split(' ');
+  const linhas = [];
+  let atual = '';
+  for (const palavra of palavras) {
+    const teste = atual ? `${atual} ${palavra}` : palavra;
+    if (teste.length > largura && atual) {
+      linhas.push(atual);
+      atual = palavra;
+    } else atual = teste;
+  }
+  if (atual) linhas.push(atual);
+  return linhas;
+}
+
+function ondaY(x, fase) {
+  const parede = x > 250 ? -(x - 250) * .45 : 0;
+  return 116
+    + Math.sin((x + fase) * .045) * 6
+    + Math.sin((x * .12) + fase * .06) * 2.5
+    + parede;
+}
+
+function desenharFundo(tempo, distancia) {
+  ret(0, 0, W, H, COR.azulCeu);
+
+  // céu em faixas de baixa resolução
+  ret(0, 0, W, 24, '#c75d5a');
+  ret(0, 24, W, 22, '#f08b55');
+  ret(0, 46, W, 28, '#ffbd58');
+  ret(0, 74, W, 34, '#79d5e9');
+
+  // sol quadrado
+  const solX = 260 - (distancia * .02 % 18);
+  ret(solX - 9, 15, 18, 18, COR.amarelo);
+  ret(solX - 12, 18, 24, 12, COR.amarelo);
