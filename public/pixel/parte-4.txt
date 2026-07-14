@@ -1,0 +1,220 @@
+  }
+
+  terminarRodada() {
+    if (this.estado !== 'jogando') return;
+    this.estado = 'escolha';
+    this.escolhas = embaralhar(PODERES).slice(0, 3);
+    som.premio();
+  }
+
+  escolherPoder(indice) {
+    const poder = this.escolhas[indice];
+    if (!poder) return;
+    this.poderes[poder.id] = (this.poderes[poder.id] || 0) + 1;
+    this.modificadores();
+    this.rodada += 1;
+    this.estado = 'jogando';
+    this.iniciarRodada();
+    this.mostrar(`${poder.sigla}: ${poder.nome.toUpperCase()}`);
+  }
+
+  fimDeJogo() {
+    this.estado = 'fim';
+    this.recorde = Math.max(this.recorde, Math.floor(this.jogador.pontos));
+    localStorage.setItem('mare-limpa-recorde', String(this.recorde));
+  }
+
+  atualizar(dt) {
+    this.tempo += dt;
+    if (consumiu('pausar')) {
+      if (this.estado === 'jogando') this.estado = 'pausa';
+      else if (this.estado === 'pausa') this.estado = 'jogando';
+    }
+    if (this.estado !== 'jogando') return;
+
+    this.tempoRodada -= dt;
+    this.distancia += this.jogador.velocidade * dt * .4;
+    this.faseOnda += this.jogador.velocidade * dt * .7;
+    this.tempoMensagem = Math.max(0, this.tempoMensagem - dt);
+    this.jogador.invencivel = Math.max(0, this.jogador.invencivel - dt);
+
+    const direcao = (segurando('direita') ? 1 : 0) - (segurando('esquerda') ? 1 : 0);
+    this.jogador.vx += direcao * 145 * dt;
+    this.jogador.vx *= Math.exp(-dt * 5.2);
+    this.jogador.vx = limitar(this.jogador.vx, -76, 76);
+    this.jogador.x = limitar(this.jogador.x + this.jogador.vx * dt, 38, 242);
+    this.jogador.velocidade = (54 + Math.min(18, this.rodada * 1.4)) * this.mod.velocidade;
+
+    const superficie = ondaY(this.jogador.x, this.faseOnda) - 10;
+    if (this.jogador.noChao && consumiu('pular')) {
+      this.jogador.noChao = false;
+      this.jogador.vy = -74;
+      som.pulo();
+    }
+    const estavaNoChao = this.jogador.noChao;
+    if (!this.jogador.noChao) {
+      this.jogador.vy += 175 * dt;
+      this.jogador.y += this.jogador.vy * dt;
+      if (this.jogador.y >= superficie) {
+        this.jogador.y = superficie;
+        this.jogador.vy = 0;
+        this.jogador.noChao = true;
+        if (!estavaNoChao && this.mod.pipoca) this.explosaoPipoca();
+      }
+    } else this.jogador.y = superficie;
+
+    this.temporizadores.spawn -= dt;
+    if (this.temporizadores.spawn <= 0) {
+      this.spawn();
+      this.temporizadores.spawn = limitar(1.15 - this.rodada * .025, .55, 1.15);
+    }
+
+    const velocidade = this.jogador.velocidade;
+    for (const item of this.itens) {
+      item.x -= velocidade * dt;
+      item.y = ondaY(item.x, this.faseOnda) - 2;
+      if (this.mod.bloco) {
+        item.x += Math.sin(this.tempo * 8 + item.fase) * dt * (5 + this.mod.bloco * 2);
+        item.x += Math.sign(this.jogador.x - item.x) * dt * this.mod.bloco * 2.2;
+      }
+    }
+    for (const item of this.obstaculos) {
+      item.x -= velocidade * dt;
+      item.y = ondaY(item.x, this.faseOnda) - 1;
+    }
+    for (const item of this.esgotos) item.x -= velocidade * dt;
+
+    this.itens = this.itens.filter((item) => item.x > -30);
+    this.obstaculos = this.obstaculos.filter((item) => item.x > -30);
+    this.esgotos = this.esgotos.filter((item) => item.x + item.largura > -30);
+
+    for (const item of [...this.itens]) {
+      if (Math.hypot(item.x - this.jogador.x, item.y - this.jogador.y) < this.mod.alcance) this.coletar(item);
+    }
+
+    for (const item of [...this.obstaculos]) {
+      if (this.jogador.noChao && Math.abs(item.x - this.jogador.x) < 10 && Math.abs(item.y - this.jogador.y) < 12) {
+        this.obstaculos.splice(this.obstaculos.indexOf(item), 1);
+        this.impacto(item.tipo === 'pedra' ? 'PEDRA' : item.tipo === 'nadador' ? 'CUIDADO COM O NADADOR' : 'TUBARÃO');
+      }
+    }
+
+    let denunciaDisponivel = null;
+    for (const esgoto of this.esgotos) {
+      const distancia = Math.abs(esgoto.x - this.jogador.x);
+      const dentro = distancia < esgoto.largura / 2 - 2;
+      const naBorda = distancia < esgoto.largura / 2 + 15 && !dentro;
+      if (naBorda && !esgoto.denunciado) denunciaDisponivel = esgoto;
+      if (dentro && this.jogador.noChao && !esgoto.atingiu) {
+        esgoto.atingiu = true;
+        this.impacto('ESGOTO');
+      }
+    }
+    document.querySelector('[data-acao="denunciar"]')?.classList.toggle('disponivel', Boolean(denunciaDisponivel));
+    if (consumiu('denunciar') && denunciaDisponivel) this.denunciar(denunciaDisponivel);
+
+    this.atualizarAjudantes(dt);
+    this.atualizarParticulas(dt);
+
+    if (this.tempoRodada <= 0) this.terminarRodada();
+  }
+
+  atualizarAjudantes(dt) {
+    if (this.mod.gaivotas) {
+      this.temporizadores.gaivota -= dt;
+      if (this.temporizadores.gaivota <= 0) {
+        const alvo = this.itens.reduce((melhor, item) => !melhor || Math.abs(item.x - this.jogador.x) < Math.abs(melhor.x - this.jogador.x) ? item : melhor, null);
+        if (alvo && Math.abs(alvo.x - this.jogador.x) < 85 + this.mod.gaivotas * 12) this.coletar(alvo, 'GAIVOTA');
+        this.temporizadores.gaivota = Math.max(.45, 1.8 - this.mod.gaivotas * .22);
+      }
+    }
+    if (this.mod.tubarao) {
+      this.temporizadores.tubarao -= dt;
+      if (this.temporizadores.tubarao <= 0) {
+        const alvo = this.itens.find((item) => item.x > this.jogador.x - 30 && item.x < this.jogador.x + 110);
+        if (alvo) this.coletar(alvo, 'TUBARÃO');
+        this.temporizadores.tubarao = Math.max(.7, 2.5 - this.mod.tubarao * .3);
+      }
+    }
+    if (this.mod.drone) {
+      this.temporizadores.drone -= dt;
+      if (this.temporizadores.drone <= 0) {
+        const alvo = this.esgotos.find((item) => !item.denunciado && item.x > 0 && item.x < W);
+        if (alvo) this.denunciar(alvo, true);
+        this.temporizadores.drone = Math.max(2.2, 7 - this.mod.drone * .8);
+      }
+    }
+    if (this.mod.rede) {
+      this.temporizadores.rede -= dt;
+      if (this.temporizadores.rede <= 0) {
+        const quantidade = Math.min(this.itens.length, 2 + this.mod.rede);
+        for (let i = 0; i < quantidade; i += 1) {
+          const alvo = this.itens[0];
+          if (alvo) this.coletar(alvo, 'MUTIRÃO');
+        }
+        this.efeitoRede = .7;
+        this.temporizadores.rede = Math.max(4, 11 - this.mod.rede * 1.1);
+      }
+    }
+    this.efeitoRede = Math.max(0, this.efeitoRede - dt);
+    this.efeitoPipoca = Math.max(0, this.efeitoPipoca - dt);
+  }
+
+  explosaoPipoca() {
+    const raio = 34 + this.mod.pipoca * 10;
+    let limpos = 0;
+    for (const item of [...this.itens]) {
+      if (Math.abs(item.x - this.jogador.x) < raio && limpos < 1 + this.mod.pipoca * 2) {
+        this.coletar(item, 'PIPOCA');
+        limpos += 1;
+      }
+    }
+    for (const item of this.obstaculos) {
+      if (Math.abs(item.x - this.jogador.x) < raio) item.x += item.x > this.jogador.x ? 28 : -28;
+    }
+    this.efeitoPipoca = .55;
+    if (limpos) this.mostrar(`PRANCHA PIPOCA: ${limpos} ITENS`);
+  }
+
+  atualizarParticulas(dt) {
+    for (const p of this.particulas) {
+      p.vida -= dt;
+      p.vy += 90 * dt;
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+    }
+    this.particulas = this.particulas.filter((p) => p.vida > 0);
+  }
+
+  desenhar() {
+    desenharFundo(this.tempo, this.distancia);
+    desenharMar(this.faseOnda);
+
+    for (const esgoto of this.esgotos) desenharEsgoto(esgoto, this.faseOnda);
+    for (const item of this.itens) desenharLixo(item, this.tempo);
+    for (const item of this.obstaculos) desenharObstaculo(item, this.tempo);
+
+    if (this.mod.rede && this.efeitoRede > 0) {
+      const x = inteiro((1 - this.efeitoRede / .7) * 390 - 40);
+      ctx.strokeStyle = COR.verde;
+      ctx.lineWidth = 1;
+      for (let i = -3; i < 4; i += 1) {
+        ctx.beginPath(); ctx.moveTo(x + i * 8, 78); ctx.lineTo(x + i * 8, 150); ctx.stroke();
+      }
+      for (let y = 84; y < 150; y += 8) {
+        ctx.beginPath(); ctx.moveTo(x - 26, y); ctx.lineTo(x + 26, y); ctx.stroke();
+      }
+    }
+
+    if (this.efeitoPipoca > 0) {
+      const raio = inteiro((1 - this.efeitoPipoca / .55) * (40 + this.mod.pipoca * 10));
+      ctx.strokeStyle = COR.rosa;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.ellipse(inteiro(this.jogador.x), inteiro(this.jogador.y + 8), raio, Math.max(3, raio * .22), 0, 0, TAU);
+      ctx.stroke();
+    }
+
+    if (this.mod.drone) desenharDrone(this.jogador.x + 24, this.jogador.y - 26, this.tempo);
+    if (this.mod.tubarao) desenharTubaraoAmigo(this.jogador.x - 24, ondaY(this.jogador.x - 24, this.faseOnda) + 5, this.tempo);
+    for (let i = 0; i < Math.min(4, this.mod.gaivotas); i += 1) {
