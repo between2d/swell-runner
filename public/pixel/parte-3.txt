@@ -1,0 +1,220 @@
+    ret(x + item.largura / 2 - 3, y - 13, 1, 3, COR.claro);
+  } else {
+    ret(x + item.largura / 2 - 5, y - 12, 5, 5, COR.verde);
+    texto('OK', x + item.largura / 2 - 3, y - 11, COR.preto, 5, 'center');
+  }
+}
+
+function desenharDrone(x, y, tempo) {
+  const sobe = Math.floor(Math.sin(tempo * 5) * 2);
+  ret(x - 5, y - 3 + sobe, 10, 5, COR.amarelo);
+  ret(x - 9, y - 4 + sobe, 4, 1, COR.preto);
+  ret(x + 5, y - 4 + sobe, 4, 1, COR.preto);
+  ret(x - 10, y - 6 + sobe, 6, 1, COR.claro);
+  ret(x + 5, y - 6 + sobe, 6, 1, COR.claro);
+  ret(x - 1, y + 2 + sobe, 3, 2, COR.vermelho);
+}
+
+function desenharTubaraoAmigo(x, y, tempo) {
+  const cauda = Math.floor(Math.sin(tempo * 9) * 2);
+  ret(x - 8, y - 3, 14, 6, '#4ba1b6');
+  ret(x + 6, y - 2, 4 + cauda, 4, '#4ba1b6');
+  ret(x - 1, y - 7, 4, 4, '#4ba1b6');
+  ret(x - 4, y - 1, 1, 1, COR.preto);
+  ret(x - 3, y + 1, 5, 1, COR.claro);
+}
+
+function desenharGaivota(x, y, tempo, fase) {
+  const asa = Math.floor(Math.sin(tempo * 11 + fase) * 2);
+  ret(x - 2, y - 1, 5, 3, COR.claro);
+  ret(x - 7, y - 2 - asa, 5, 2, COR.claro);
+  ret(x + 3, y - 2 + asa, 5, 2, COR.claro);
+  ret(x + 3, y, 2, 1, COR.amarelo);
+}
+
+class Jogo {
+  constructor() {
+    this.estado = 'menu';
+    this.tempo = 0;
+    this.ultimo = performance.now();
+    this.mensagem = '';
+    this.tempoMensagem = 0;
+    this.escolhas = [];
+    this.recorde = Number(localStorage.getItem('mare-limpa-recorde') || 0);
+    this.resetar();
+    this.loop = this.loop.bind(this);
+    requestAnimationFrame(this.loop);
+  }
+
+  resetar() {
+    this.jogador = {
+      x: 104, y: 95, vx: 0, vy: 0, noChao: true,
+      velocidade: 54, pontos: 0, lixo: 0, denuncias: 0,
+      combo: 0, multiplicador: 1, vidas: 3, invencivel: 0,
+      escudo: 0, pranchaGrande: false,
+    };
+    this.rodada = 1;
+    this.tempoRodada = DURACAO_RODADA;
+    this.lixoRodada = 0;
+    this.denunciasRodada = 0;
+    this.pontosInicioRodada = 0;
+    this.distancia = 0;
+    this.faseOnda = 0;
+    this.itens = [];
+    this.esgotos = [];
+    this.obstaculos = [];
+    this.particulas = [];
+    this.poderes = {};
+    this.temporizadores = { spawn: .4, gaivota: 1.2, tubarao: 1.5, drone: 3.5, rede: 7, saco: 0 };
+    this.efeitoRede = 0;
+    this.efeitoPipoca = 0;
+    this.modificadores();
+  }
+
+  iniciar() {
+    som.iniciar();
+    this.resetar();
+    this.estado = 'jogando';
+    this.iniciarRodada(true);
+  }
+
+  iniciarRodada(primeira = false) {
+    this.tempoRodada = DURACAO_RODADA;
+    this.lixoRodada = 0;
+    this.denunciasRodada = 0;
+    this.pontosInicioRodada = this.jogador.pontos;
+    this.jogador.escudo = this.nivel('bolha');
+    this.jogador.invencivel = 1;
+    this.itens.length = 0;
+    this.esgotos.length = 0;
+    this.obstaculos.length = 0;
+    this.temporizadores.spawn = .25;
+    if (this.nivel('mutirao')) {
+      for (let i = 0; i < 5 + this.nivel('mutirao'); i += 1) this.criarLixo(330 + i * 18, escolher(TIPOS_LIXO));
+      this.jogador.combo += this.nivel('mutirao');
+    }
+    this.mostrar(primeira ? 'RODADA 1: LIMPE ESSA ONDA!' : `RODADA ${this.rodada}: VAI!`);
+  }
+
+  nivel(id) { return this.poderes[id] || 0; }
+
+  modificadores() {
+    this.mod = {
+      alcance: 10 + this.nivel('pranchao') * 3,
+      velocidade: 1 + this.nivel('caldo') * .08,
+      gaivotas: this.nivel('gaivotas'),
+      tubarao: this.nivel('tubarao'),
+      drone: this.nivel('drone'),
+      rede: this.nivel('rede'),
+      pipoca: this.nivel('pipoca'),
+      saco: this.nivel('saco'),
+      bloco: this.nivel('bloco'),
+      farol: this.nivel('farol'),
+    };
+    this.jogador.pranchaGrande = this.nivel('pranchao') > 0;
+  }
+
+  criarLixo(x = 340, tipo = escolher(TIPOS_LIXO)) {
+    this.itens.push({ tipo, x, y: ondaY(x, this.faseOnda) - 2, fase: aleatorio(0, TAU), pego: false });
+  }
+
+  criarEsgoto(x = 350) {
+    this.esgotos.push({ x, largura: aleatorio(34, 54), denunciado: false, atingiu: false, fase: aleatorio(0, TAU) });
+  }
+
+  criarObstaculo(x = 345) {
+    this.obstaculos.push({ tipo: escolher(['pedra', 'nadador', 'tubarao']), x, y: ondaY(x, this.faseOnda), fase: aleatorio(0, TAU) });
+  }
+
+  spawn() {
+    const r = Math.random();
+    const quantidade = 1 + Math.floor(Math.random() * (2 + Math.min(3, this.rodada / 3)));
+    if (r < .58) {
+      const inicio = 335;
+      for (let i = 0; i < quantidade; i += 1) this.criarLixo(inicio + i * aleatorio(13, 20));
+    } else if (r < .76) this.criarObstaculo();
+    else if (r < .9) this.criarEsgoto();
+    else {
+      this.criarLixo(340, 'pneu');
+      this.criarObstaculo(375);
+    }
+  }
+
+  mostrar(mensagem, duracao = 1.6) {
+    this.mensagem = mensagem;
+    this.tempoMensagem = duracao;
+  }
+
+  coletar(item, fonte = 'SURFE') {
+    const indice = this.itens.indexOf(item);
+    if (indice < 0) return;
+    this.itens.splice(indice, 1);
+    const base = VALOR_LIXO[item.tipo] || 90;
+    const pontos = Math.floor(base * this.jogador.multiplicador);
+    this.jogador.pontos += pontos;
+    this.jogador.lixo += 1;
+    this.lixoRodada += 1;
+    this.jogador.combo += 1;
+    this.jogador.multiplicador = limitar(1 + Math.floor(this.jogador.combo / 5) * .25, 1, 4);
+    this.estourar(item.x, item.y, [COR.verde, COR.amarelo, COR.rosa]);
+    som.coleta();
+    if (fonte !== 'SURFE' || this.jogador.lixo < 4 || this.jogador.lixo % 5 === 0) this.mostrar(`${fonte}: ${item.tipo.toUpperCase()} +${pontos}`);
+
+    if (this.mod.saco) {
+      this.temporizadores.saco += 1;
+      const capacidade = Math.max(4, 9 - this.mod.saco);
+      if (this.temporizadores.saco >= capacidade) {
+        this.temporizadores.saco = 0;
+        const bonus = Math.floor((350 + this.mod.saco * 160) * this.jogador.multiplicador);
+        this.jogador.pontos += bonus;
+        this.estourar(this.jogador.x, this.jogador.y - 8, [COR.rosa, COR.amarelo, COR.verde, COR.claro], 18);
+        this.mostrar(`SACO SEM FUNDO ESTOUROU +${bonus}`);
+        som.premio();
+      }
+    }
+  }
+
+  denunciar(esgoto, automatico = false) {
+    if (!esgoto || esgoto.denunciado) return;
+    esgoto.denunciado = true;
+    this.jogador.denuncias += 1;
+    this.denunciasRodada += 1;
+    const pontos = Math.floor(240 * this.jogador.multiplicador);
+    this.jogador.pontos += pontos;
+    this.estourar(esgoto.x + esgoto.largura / 2, ondaY(esgoto.x, this.faseOnda) - 8, [COR.vermelho, COR.claro, COR.verde], 14);
+    this.mostrar(`${automatico ? 'DRONE DEDUREBA' : 'DENÚNCIA + AÇÃO'} +${pontos}`);
+    som.premio();
+  }
+
+  impacto(motivo) {
+    if (this.jogador.invencivel > 0) return;
+    if (this.jogador.escudo > 0) {
+      this.jogador.escudo -= 1;
+      this.jogador.invencivel = 1;
+      this.mostrar('BOLHA BIODEGRADÁVEL: PLOP!');
+      this.estourar(this.jogador.x, this.jogador.y, [COR.azulCeu, COR.claro]);
+      return;
+    }
+    this.jogador.vidas -= 1;
+    this.jogador.combo = 0;
+    this.jogador.multiplicador = 1;
+    this.jogador.invencivel = 2;
+    this.jogador.vy = -35;
+    this.jogador.noChao = false;
+    this.jogador.pontos = Math.max(0, this.jogador.pontos - 120);
+    this.mostrar(`${motivo}! -120`);
+    som.impacto();
+    navigator.vibrate?.([40, 40, 40]);
+    if (this.jogador.vidas <= 0) this.fimDeJogo();
+  }
+
+  estourar(x, y, cores, quantidade = 10) {
+    for (let i = 0; i < quantidade; i += 1) {
+      this.particulas.push({
+        x, y,
+        vx: aleatorio(-34, 34),
+        vy: aleatorio(-42, -8),
+        vida: aleatorio(.35, .8),
+        cor: escolher(cores),
+      });
+    }
