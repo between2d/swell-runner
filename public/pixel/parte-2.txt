@@ -1,0 +1,220 @@
+
+  // nuvens
+  const nuvem = (base, y, escala = 1) => {
+    const x = ((base - distancia * .04) % 390 + 390) % 390 - 40;
+    ret(x, y, 18 * escala, 4 * escala, COR.claro);
+    ret(x + 5 * escala, y - 4 * escala, 8 * escala, 4 * escala, COR.claro);
+    ret(x + 12 * escala, y - 2 * escala, 10 * escala, 6 * escala, COR.claro);
+  };
+  nuvem(55, 33, 1);
+  nuvem(210, 49, .8);
+  nuvem(350, 26, 1.2);
+
+  // cidade de João Pessoa em parallax
+  const desloc = -(distancia * .15 % 640);
+  for (let repeticao = -1; repeticao < 2; repeticao += 1) {
+    const base = desloc + repeticao * 640;
+    desenharCidade(base);
+  }
+}
+
+function desenharCidade(base) {
+  // mar distante
+  ret(base, 86, 640, 31, '#2b8fbf');
+
+  // falésia e farol do Cabo Branco
+  ret(base + 20, 78, 48, 31, COR.barro);
+  ret(base + 26, 73, 42, 7, '#c96b46');
+  ret(base + 43, 57, 4, 19, COR.claro);
+  ret(base + 41, 54, 8, 4, COR.vermelho);
+  ret(base + 37, 52, 16, 3, COR.claro);
+  ret(base + 40, 49, 10, 3, COR.claro);
+
+  // prédios da orla
+  const predios = [
+    [92, 62, 14, 45, '#ddd8c7'], [111, 70, 12, 37, '#b9d0cf'], [128, 55, 16, 52, '#e9c7a6'],
+    [150, 67, 11, 40, '#d8b1a9'], [167, 59, 18, 48, '#e8e0c7'], [190, 72, 13, 35, '#a9c7ce'],
+    [211, 52, 15, 55, '#e6d4bc'], [232, 65, 11, 42, '#c9d4c5'],
+  ];
+  for (const [x, y, w, h, cor] of predios) {
+    ret(base + x, y, w, h, cor);
+    for (let j = y + 5; j < y + h - 2; j += 7) ret(base + x + 3, j, w - 6, 2, '#557b8c');
+  }
+
+  // Hotel Tambaú simplificado
+  ret(base + 270, 91, 44, 13, '#d1c0a8');
+  ret(base + 275, 86, 34, 8, '#8c9c7a');
+  ret(base + 280, 88, 24, 6, '#376a68');
+  ret(base + 285, 82, 14, 5, '#d1c0a8');
+  ret(base + 291, 72, 2, 11, COR.vermelho);
+
+  // coqueiros
+  for (const x of [75, 245, 326, 362, 405, 452, 510, 570]) desenharCoqueiro(base + x, 106, (x % 3) * .4);
+
+  // quiosques
+  for (const [x, cor] of [[340, COR.laranja], [390, COR.rosa], [470, COR.verde]]) {
+    ret(base + x, 96, 13, 9, cor);
+    ret(base + x - 2, 93, 17, 3, COR.claro);
+  }
+}
+
+function desenharCoqueiro(x, y, fase = 0) {
+  ret(x, y - 20, 2, 20, '#79503a');
+  const balanço = Math.sin(performance.now() * .0015 + fase) > 0 ? 1 : 0;
+  ret(x - 7 + balanço, y - 23, 8, 2, COR.verdeEscuro);
+  ret(x + 1, y - 24, 8 - balanço, 2, COR.verdeEscuro);
+  ret(x - 5, y - 28, 6, 2, COR.verdeEscuro);
+  ret(x + 1, y - 27, 5, 2, COR.verdeEscuro);
+}
+
+function desenharMar(fase) {
+  const pontos = [];
+  for (let x = 0; x <= W; x += 2) pontos.push([x, ondaY(x, fase)]);
+
+  ctx.fillStyle = COR.azulMar;
+  ctx.beginPath();
+  ctx.moveTo(0, H);
+  for (const [x, y] of pontos) ctx.lineTo(inteiro(x), inteiro(y));
+  ctx.lineTo(W, H);
+  ctx.closePath();
+  ctx.fill();
+
+  // faixas de profundidade
+  for (let y = 132; y < H; y += 12) {
+    ctx.fillStyle = y % 24 === 0 ? COR.azulFundo : '#0e5f9e';
+    ctx.fillRect(0, y, W, 6);
+  }
+
+  // linha da onda e espuma
+  for (let x = 0; x < W; x += 3) {
+    const y = inteiro(ondaY(x, fase));
+    ret(x, y - 1, 4, 3, COR.espuma);
+    if ((x + inteiro(fase)) % 17 < 5) ret(x + 1, y + 4, 3, 2, '#7edff2');
+  }
+
+  // espuma da parede direita
+  for (let i = 0; i < 28; i += 1) {
+    const x = 255 + (i * 7 + inteiro(fase * .5)) % 66;
+    const y = inteiro(ondaY(x, fase) + (i % 5) * 4);
+    ret(x, y, 4 + (i % 3), 3, COR.espuma);
+  }
+}
+
+function desenharSurfista(p, tempo, sacoNivel = 0) {
+  const x = inteiro(p.x);
+  const y = inteiro(p.y);
+  const noAr = !p.noChao;
+  const inclina = p.vx > 10 ? 1 : p.vx < -10 ? -1 : 0;
+  const quadro = Math.floor(tempo * 10) % 2;
+
+  // prancha
+  const largura = p.pranchaGrande ? 28 : 21;
+  ret(x - largura / 2, y + 9, largura, 3, COR.amarelo);
+  ret(x - largura / 2 + 3, y + 12, largura - 6, 1, COR.rosa);
+
+  // saco sem fundo nas costas
+  if (sacoNivel > 0) {
+    const tamanho = 4 + Math.min(5, sacoNivel);
+    ret(x - 8, y - 5, tamanho + 3, tamanho + 5, '#6d4a83');
+    ret(x - 7, y - 8, 3, 3, COR.amarelo);
+  }
+
+  // pernas
+  if (noAr) {
+    ret(x - 5, y + 1, 3, 7, COR.noite);
+    ret(x + 3, y, 3, 8, COR.noite);
+  } else {
+    ret(x - 5 + inclina, y + 2, 4, 7, COR.noite);
+    ret(x + 2 + inclina, y + 3, 4, 6, COR.noite);
+  }
+
+  // tronco
+  ret(x - 4, y - 8, 9, 11, COR.rosa);
+  ret(x - 2, y - 6, 5, 3, COR.claro);
+
+  // cabeça e cabelo
+  ret(x - 3, y - 14, 7, 6, COR.pele);
+  ret(x - 4, y - 16, 8, 3, COR.cabelo);
+  ret(x + 3, y - 13, 2, 2, COR.pele);
+  ret(x + 1, y - 12, 1, 1, COR.preto);
+
+  // braços, mais expressivos no ar
+  if (noAr) {
+    const alto = quadro ? -1 : 1;
+    ret(x - 9, y - 10 + alto, 6, 2, COR.pele);
+    ret(x + 4, y - 12 - alto, 7, 2, COR.pele);
+  } else {
+    ret(x - 8 + inclina, y - 7 + quadro, 5, 2, COR.pele);
+    ret(x + 4 + inclina, y - 6 - quadro, 5, 2, COR.pele);
+  }
+
+  // gotas
+  if (p.velocidade > 62 && p.noChao) {
+    ret(x - 15, y + 9, 3, 2, COR.espuma);
+    ret(x - 21, y + 12, 2, 2, COR.espuma);
+  }
+}
+
+function desenharLixo(item, fase) {
+  const x = inteiro(item.x);
+  const y = inteiro(item.y + Math.sin(fase * 4 + item.fase) * 1.5);
+  if (item.tipo === 'garrafa') {
+    ret(x - 5, y - 2, 9, 4, '#70d6bd');
+    ret(x + 4, y - 1, 3, 2, COR.vermelho);
+    ret(x - 2, y - 1, 1, 1, COR.preto);
+  } else if (item.tipo === 'lata') {
+    ret(x - 4, y - 3, 8, 6, COR.vermelho);
+    ret(x - 2, y - 2, 4, 1, COR.claro);
+    ret(x + 1, y, 1, 1, COR.preto);
+  } else if (item.tipo === 'sacola') {
+    ret(x - 5, y - 4, 10, 8, '#eceaf4');
+    ret(x - 4, y - 6, 3, 3, '#eceaf4');
+    ret(x + 2, y - 6, 3, 3, '#eceaf4');
+    ret(x - 2, y - 1, 1, 1, COR.preto);
+    ret(x + 2, y - 1, 1, 1, COR.preto);
+  } else if (item.tipo === 'pneu') {
+    ret(x - 5, y - 5, 10, 10, COR.preto);
+    ret(x - 2, y - 2, 4, 4, COR.azulMar);
+    ret(x - 3, y - 3, 1, 1, COR.claro);
+    ret(x + 2, y - 3, 1, 1, COR.claro);
+  } else {
+    ret(x - 5, y - 3, 10, 6, COR.claro);
+    ret(x - 3, y - 1, 1, 1, COR.preto);
+    ret(x + 2, y - 1, 1, 1, COR.preto);
+  }
+}
+
+function desenharObstaculo(item, fase) {
+  const x = inteiro(item.x);
+  const y = inteiro(item.y);
+  if (item.tipo === 'pedra') {
+    ret(x - 6, y - 6, 12, 8, '#455361');
+    ret(x - 4, y - 9, 7, 4, '#596979');
+    ret(x - 2, y - 5, 1, 1, COR.claro);
+    ret(x + 2, y - 5, 1, 1, COR.claro);
+  } else if (item.tipo === 'nadador') {
+    ret(x - 4, y - 5, 8, 5, COR.pele);
+    ret(x - 3, y - 8, 6, 4, COR.cabelo);
+    ret(x - 9, y, 18, 2, COR.espuma);
+    if (Math.floor(fase * 7) % 2) ret(x + 5, y - 8, 6, 2, COR.pele);
+  } else {
+    // tubarão hostil
+    ret(x - 8, y - 4, 15, 7, '#496b7c');
+    ret(x + 6, y - 2, 5, 3, '#496b7c');
+    ret(x - 2, y - 8, 4, 5, '#496b7c');
+    ret(x + 3, y - 2, 1, 1, COR.preto);
+    ret(x - 1, y + 1, 5, 1, COR.claro);
+  }
+}
+
+function desenharEsgoto(item, fase) {
+  const x = inteiro(item.x);
+  const y = inteiro(ondaY(item.x, fase));
+  ret(x - item.largura / 2, y + 2, item.largura, 12, COR.esgotoEscuro);
+  for (let i = 0; i < item.largura; i += 6) {
+    const altura = (i + inteiro(fase)) % 3;
+    ret(x - item.largura / 2 + i, y + 3 + altura, 4, 3, COR.esgoto);
+  }
+  if (!item.denunciado) {
+    ret(x + item.largura / 2 - 4, y - 9, 3, 10, COR.preto);
+    ret(x + item.largura / 2 - 5, y - 14, 5, 5, COR.vermelho);
