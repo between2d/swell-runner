@@ -1,17 +1,16 @@
 {
-  "name": "swell-runner",
-  "version": "2.0.0",
+  "name": "mare-limpa-jp",
+  "version": "3.0.0",
   "private": true,
   "type": "module",
+  "description": "Jogo 2D em pixel art sobre surfe, lixo e poluição em João Pessoa.",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --host 0.0.0.0",
     "build": "vite build",
-    "preview": "vite preview"
-  },
-  "dependencies": {
-    "three": "^0.185.1"
+    "preview": "vite preview --host 0.0.0.0"
   },
   "devDependencies": {
     "vite": "^8.1.4"
-  }
+  },
+  "license": "MIT"
 }
