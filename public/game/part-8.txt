@@ -1,0 +1,98 @@
+POWERUPS.push(
+  {
+    id: 'drone', badge: 'DRONE', name: 'Drone Dedureba',
+    description: 'Um drone fofoqueiro sobrevoa a pista e denuncia automaticamente pontos de esgoto. Cada nível reduz o tempo entre flagrantes.',
+  },
+  {
+    id: 'shark', badge: 'NHAC', name: 'Tubarão da Reciclagem',
+    description: 'Um tubarão com consciência ambiental nada ao seu lado e abocanha lixo próximo. Não pergunte onde ele guarda os pneus.',
+  },
+  {
+    id: 'net', badge: 'REDE', name: 'Rede do Mutirão',
+    description: 'De tempos em tempos, uma rede gigante atravessa a onda e recolhe vários itens de uma vez. Trabalho coletivo, física duvidosa.',
+  },
+  {
+    id: 'popcorn', badge: 'POC', name: 'Prancha Pipoca',
+    description: 'Cada aterrissagem solta uma onda de choque que recolhe lixo e empurra obstáculos para longe. Pousar virou faxina explosiva.',
+  },
+  {
+    id: 'bag', badge: 'SACO', name: 'Saco Sem Fundo',
+    description: 'O lixo vai enchendo um saco impossível nas suas costas. Quando ele estoura, vira uma chuva ridícula de pontos e Flow.',
+  },
+  {
+    id: 'parade', badge: 'BLOCO', name: 'Bloco da Maré Limpa',
+    description: 'O lixo entra num bloco de carnaval e dança em direção à prancha no ritmo. Nem a garrafa PET resiste ao batuque.',
+  },
+);
+
+function ensureFunChaos(gameInstance) {
+  if (!gameInstance.chaos) {
+    gameInstance.chaos = {
+      droneTimer: 4,
+      sharkTimer: 2,
+      netTimer: 7,
+      bagStash: 0,
+      paradeBeat: -1,
+    };
+  }
+  if (!gameInstance.chaosVisuals) gameInstance.chaosVisuals = [];
+}
+
+Game.prototype.removeFunHelper = function removeFunHelper(key) {
+  const helper = this[key];
+  if (!helper) return;
+  helper.parent?.remove(helper);
+  this[key] = null;
+};
+
+Game.prototype.rebuildFunHelpers = function rebuildFunHelpers() {
+  ensureFunChaos(this);
+  this.removeFunHelper('gossipDrone');
+  this.removeFunHelper('recyclerShark');
+  this.removeFunHelper('bottomlessBag');
+
+  if (this.mods.drone > 0) {
+    const drone = new THREE.Group();
+    const shell = toonMaterial(0xffef64);
+    const dark = toonMaterial(0x18222b);
+    const red = toonMaterial(0xff3b30, { emissive: 0x8a0700, emissiveIntensity: 0.5 });
+    const body = new THREE.Mesh(new THREE.SphereGeometry(0.34, 10, 7), shell);
+    body.scale.set(1.25, 0.62, 1);
+    addOutline(body, 1.07, 0.72);
+    drone.add(body);
+    drone.userData.rotors = [];
+    for (const sideX of [-1, 1]) {
+      for (const sideZ of [-1, 1]) {
+        const arm = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.07, 0.07), dark);
+        arm.position.set(sideX * 0.43, 0, sideZ * 0.28);
+        arm.rotation.y = sideZ * 0.42;
+        const rotor = new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.035, 5, 12), dark);
+        rotor.position.set(sideX * 0.76, 0.08, sideZ * 0.54);
+        rotor.rotation.x = Math.PI / 2;
+        drone.add(arm, rotor);
+        drone.userData.rotors.push(rotor);
+      }
+    }
+    const lens = new THREE.Mesh(new THREE.SphereGeometry(0.11, 8, 6), red);
+    lens.position.set(0, -0.16, -0.3);
+    drone.add(lens);
+    drone.userData.lens = lens;
+    this.scene.add(drone);
+    this.gossipDrone = drone;
+  }
+
+  if (this.mods.shark > 0) {
+    const shark = new THREE.Group();
+    const blue = toonMaterial(0x3a85a6);
+    const pale = toonMaterial(0xd8f2ed);
+    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.42, 1.25, 5, 10), blue);
+    body.rotation.x = Math.PI / 2;
+    body.scale.set(1, 1, 1.25);
+    addOutline(body, 1.055, 0.72);
+    const belly = new THREE.Mesh(new THREE.SphereGeometry(0.37, 10, 7), pale);
+    belly.scale.set(0.8, 0.42, 1.45);
+    belly.position.y = -0.22;
+    const fin = new THREE.Mesh(new THREE.ConeGeometry(0.3, 0.8, 5), blue);
+    fin.position.set(0, 0.45, 0.1);
+    fin.rotation.z = Math.PI;
+    const tail = new THREE.Mesh(new THREE.ConeGeometry(0.48, 0.78, 4), blue);
