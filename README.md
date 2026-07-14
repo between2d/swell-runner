@@ -1,65 +1,47 @@
-# Swell Runner: João Pessoa
+# Maré Limpa JP
 
-A cartoon Three.js surfing game about collecting ocean garbage, documenting sewage points and avoiding contamination along a fictionalized João Pessoa coast.
+Jogo 2D em pixel art sobre surfe, lixo e poluição nas praias e rios urbanos de João Pessoa.
 
-## Current game loop
+## Direção atual
 
-- Surf timed 35-second rounds.
-- Collect bottles, cans, bags, tyres and Styrofoam for points, Flow and action bonuses.
-- Approach the safe edge of sewage patches and register reports for extra points.
-- Avoid rocks, buoys and direct contact with sewage.
-- After each round, choose one of three permanent absurd upgrades.
-- Stack upgrades across the run: cleanup seagulls, trash magnets, giant boards, coconut cannons, shields and other nonsense.
-- Read a short local pollution-awareness message between rounds.
+A versão pública foi reconstruída como um jogo lateral em baixa resolução, com arte original feita diretamente no Canvas 2D. A versão anterior em Three.js está preservada na branch `arquivo-versao-3d`.
 
-The game is educational fiction, not a live balneability map. Players should use official beach-quality reports when deciding whether to swim.
+Referências de linguagem e ritmo: jogos clássicos de surfe em visão lateral e jogos modernos feitos com PICO-8. Nenhum sprite ou código dessas referências foi copiado.
 
-## Movimento Esgotei reference
+## Como jogar
 
-The awareness language and protest-banner styling are inspired by **Movimento Esgotei**, a citizen environmental initiative from Paraíba focused on sewage, urban rivers, beaches, public reporting and collective action.
+- **Esquerda / direita:** mover na onda
+- **Espaço / seta para cima:** pular
+- **E:** denunciar um ponto de esgoto quando estiver na borda segura
+- **P / Esc:** pausar
 
-- Instagram: **@movimentoesgotei**
-- Recurring ideas used in the game: “Eu esgotei. Nós esgotamos.”, “Denúncia + ação ambiental” and “Transforme indignação em atitude.”
+No celular, use os botões na tela.
 
-This is an independent game prototype and does not claim an official partnership, endorsement or institutional affiliation with Movimento Esgotei.
+## Estrutura
 
-## Controls
+- Rodadas de 30 segundos
+- Três poderes aleatórios ao fim de cada rodada
+- Lixo recolhido rende pontos e combo
+- Pontos de esgoto podem ser denunciados
+- Obstáculos e contato com esgoto removem vidas
+- Cenário inspirado de forma estilizada na orla de João Pessoa
+- Interface e textos integralmente em português
 
-### Desktop
+## Referência ambiental
 
-- **A / D** or **Left / Right:** carve
-- **W / S** or **Up / Down:** speed
-- **Space:** jump and spin
-- **Shift:** Flow boost
-- **E:** register a nearby sewage report
-- **P / Escape:** pause
+O jogo toma o Movimento Esgotei como referência local de mobilização e linguagem. É um projeto independente e não representa parceria oficial. Para decidir sobre banho de mar, consulte sempre os boletins oficiais de balneabilidade.
 
-### Mobile
-
-- Drag the left thumb pad to steer and control speed.
-- Tap **JUMP** to jump.
-- Hold **FLOW** to boost.
-- Tap **DENÚNCIA** when the button lights up near a sewage patch.
-
-## Run locally
+## Desenvolvimento
 
 ```bash
 npm install
 npm run dev
 ```
 
-## Build
+## Produção
 
 ```bash
 npm run build
 ```
 
-GitHub Pages deploys automatically from `main` through `.github/workflows/deploy.yml`.
-
-## Tech
-
-Three.js, GLSL, Vite, Web Audio API, touch, keyboard and gamepad input.
-
-## License
-
-MIT
+GitHub Pages é publicado automaticamente pela workflow em `.github/workflows/deploy.yml`.
