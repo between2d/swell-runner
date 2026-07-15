@@ -39,35 +39,66 @@ jobs:
         run: npm run build
 
       - name: Criar projeto Capacitor Android
+        id: capacitor
+        shell: bash
         run: |
-          npx cap add android
-          npx cap sync android
+          mkdir -p diagnostico
+          set +e
+          npx cap add android > diagnostico/capacitor-add.log 2>&1
+          codigo=$?
+          cat diagnostico/capacitor-add.log
+          echo "codigo=$codigo" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Sincronizar plugins e jogo
+        if: steps.capacitor.outputs.codigo == '0'
+        run: npx cap sync android
 
       - name: Gerar ícone adaptativo e splash screen
+        if: steps.capacitor.outputs.codigo == '0'
         run: |
           npm install --no-save --no-audit --no-fund @capacitor/assets sharp
           node scripts/criar-assets-android.mjs
           npx capacitor-assets generate --android
 
       - name: Aplicar experiência nativa de jogo
+        if: steps.capacitor.outputs.codigo == '0'
         run: node scripts/ajustar-android.mjs
 
       - name: Compilar APK instalável
+        if: steps.capacitor.outputs.codigo == '0'
         working-directory: android
         run: |
           chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon --stacktrace
+          ./gradlew assembleDebug --no-daemon --stacktrace 2>&1 | tee ../diagnostico/gradle.log
 
       - name: Preparar arquivo para download
+        if: success() && steps.capacitor.outputs.codigo == '0'
         run: |
           mkdir -p entrega
           cp android/app/build/outputs/apk/debug/app-debug.apk entrega/Duna-Livre-Android.apk
           sha256sum entrega/Duna-Livre-Android.apk > entrega/Duna-Livre-Android.sha256.txt
 
+      - name: Enviar diagnóstico
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Diagnostico-Duna-Livre-Android
+          path: diagnostico/
+          if-no-files-found: warn
+          retention-days: 3
+
       - name: Enviar APK como artefato
+        if: success() && steps.capacitor.outputs.codigo == '0'
         uses: actions/upload-artifact@v4
         with:
           name: Duna-Livre-Android-APK
           path: entrega/
           if-no-files-found: error
           retention-days: 14
+
+      - name: Falhar se o Capacitor não criou o projeto
+        if: steps.capacitor.outputs.codigo != '0'
+        run: |
+          echo "O Capacitor falhou. Consulte o artefato Diagnostico-Duna-Livre-Android."
+          exit 1
