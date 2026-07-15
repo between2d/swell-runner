@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: android-duna-livre
@@ -106,6 +106,21 @@ jobs:
           path: entrega/
           if-no-files-found: error
           retention-days: 14
+
+      - name: Publicar link permanente do APK
+        if: success() && steps.capacitor.outputs.codigo == '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          gh release delete duna-livre-android-latest --yes --cleanup-tag || true
+          gh release create duna-livre-android-latest \
+            entrega/Duna-Livre-Android.apk \
+            entrega/Duna-Livre-Android.sha256.txt \
+            --target "$GITHUB_SHA" \
+            --title "Duna Livre Android, build mais recente" \
+            --notes "APK de teste para instalação direta no Android. Compilado automaticamente da branch android-duna-livre. Esta versão é assinada para testes e ainda não é uma edição da Play Store." \
+            --prerelease
 
       - name: Falhar se o Capacitor não criou o projeto
         if: steps.capacitor.outputs.codigo != '0'
