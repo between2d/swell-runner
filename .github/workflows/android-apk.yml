@@ -74,9 +74,17 @@ jobs:
 
       - name: Preparar arquivo para download
         if: success() && steps.capacitor.outputs.codigo == '0'
+        shell: bash
         run: |
           mkdir -p entrega
-          cp android/app/build/outputs/apk/debug/app-debug.apk entrega/Duna-Livre-Android.apk
+          arquivo="$(find android/app/build/outputs/apk -type f -name '*.apk' | head -n 1)"
+          if [ -z "$arquivo" ]; then
+            echo "Nenhum APK encontrado após o Gradle concluir."
+            find android/app/build/outputs -maxdepth 6 -type f -print || true
+            exit 1
+          fi
+          echo "APK encontrado: $arquivo"
+          cp "$arquivo" entrega/Duna-Livre-Android.apk
           sha256sum entrega/Duna-Livre-Android.apk > entrega/Duna-Livre-Android.sha256.txt
 
       - name: Enviar diagnóstico
