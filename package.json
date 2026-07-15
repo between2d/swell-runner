@@ -1,9 +1,9 @@
 {
-  "name": "mare-limpa-jp",
-  "version": "3.0.0",
+  "name": "duna-livre",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Jogo 2D em pixel art sobre surfe, lixo e poluição em João Pessoa.",
+  "description": "Jogo 2D em pixel art de sand surf nas dunas do Nordeste.",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
