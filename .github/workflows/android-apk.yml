@@ -68,7 +68,9 @@ jobs:
       - name: Compilar APK instalável
         if: steps.capacitor.outputs.codigo == '0'
         working-directory: android
+        shell: bash
         run: |
+          set -o pipefail
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon --stacktrace 2>&1 | tee ../diagnostico/gradle.log
 
