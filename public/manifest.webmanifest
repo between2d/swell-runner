@@ -1,13 +1,13 @@
 {
-  "name": "Maré Limpa JP",
-  "short_name": "Maré Limpa JP",
-  "description": "Jogo 2D em pixel art sobre surfe, lixo, óleo e esgoto em João Pessoa.",
+  "name": "Duna Livre",
+  "short_name": "Duna Livre",
+  "description": "Jogo 2D em pixel art de sand surf nas dunas do Nordeste.",
   "start_url": "./",
   "scope": "./",
   "display": "fullscreen",
   "orientation": "any",
-  "background_color": "#101521",
-  "theme_color": "#101521",
+  "background_color": "#241720",
+  "theme_color": "#241720",
   "icons": [
     {
       "src": "./icon.svg",
