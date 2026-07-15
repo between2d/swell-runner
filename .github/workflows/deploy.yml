@@ -2,7 +2,7 @@ name: Publicar jogos no GitHub Pages
 
 on:
   push:
-    branches: [main, duna-livre]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
