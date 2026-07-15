@@ -3,32 +3,31 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#101521" />
+  <meta name="theme-color" content="#241720" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="description" content="Maré Limpa JP, jogo pixel art sobre surfe, lixo, óleo e esgoto em João Pessoa." />
+  <meta name="description" content="Duna Livre, jogo pixel art de sand surf nas dunas do Nordeste." />
   <link rel="manifest" href="./manifest.webmanifest" />
   <link rel="icon" href="./icon.svg" type="image/svg+xml" />
-  <title>Maré Limpa JP</title>
+  <title>Duna Livre</title>
 </head>
 <body>
   <main id="aplicativo">
-    <section id="moldura" aria-label="Jogo Maré Limpa JP">
-      <canvas id="jogo" width="320" height="180" aria-label="Jogo de surfe em pixel art"></canvas>
-      <div id="carregando">CARREGANDO A MARÉ...</div>
+    <section id="moldura" aria-label="Jogo Duna Livre">
+      <canvas id="jogo" width="320" height="180" aria-label="Jogo de sand surf em pixel art"></canvas>
+      <div id="carregando">AQUECENDO A AREIA...</div>
     </section>
 
     <section id="controles-mobile" aria-label="Controles do jogo">
       <div class="dpad" aria-label="Orientar a prancha">
-        <button type="button" class="cima" data-acao="cima" aria-label="Apontar para cima">▲</button>
-        <button type="button" class="esquerda" data-acao="esquerda" aria-label="Apontar para a esquerda">◀</button>
-        <button type="button" class="baixo" data-acao="baixo" aria-label="Apontar para baixo">▼</button>
-        <button type="button" class="direita" data-acao="direita" aria-label="Apontar para a direita">▶</button>
+        <button type="button" class="cima" data-acao="cima" aria-label="Subir a duna">▲</button>
+        <button type="button" class="esquerda" data-acao="esquerda" aria-label="Virar para a esquerda">◀</button>
+        <button type="button" class="baixo" data-acao="baixo" aria-label="Descer a duna">▼</button>
+        <button type="button" class="direita" data-acao="direita" aria-label="Virar para a direita">▶</button>
       </div>
       <div class="grupo acoes">
         <button type="button" class="curva" data-acao="curva" aria-label="Fazer curva fechada">CURVA</button>
-        <button type="button" class="flow" data-acao="flow" aria-label="Usar Flow">FLOW</button>
-        <button type="button" class="denuncia" data-acao="denunciar" aria-label="Denunciar mancha de óleo ou esgoto">!</button>
+        <button type="button" class="vento" data-acao="vento" aria-label="Usar impulso de vento">VENTO</button>
         <button type="button" class="pulo" data-acao="pular" aria-label="Pular na crista">PULAR</button>
       </div>
     </section>
