@@ -1,36 +1,53 @@
-# Duna Livre
+# Duna Livre para Android
 
-Versão paralela em pixel art de sand surf, criada a partir da base mecânica de Maré Limpa JP.
+Versão Android da Duna Livre, criada com Capacitor 8 sobre o jogo 2D em pixel art.
 
-## Identidade
+## Experiência móvel
 
-- título próprio: **Duna Livre**
-- cenário de dunas, serras, aerogeradores e pôr do sol
-- sandboard com direção, inércia, curva fechada e impulso de vento
-- obstáculos: pedras, cactos, ravinas, arbustos e crânios
-- coletáveis: cristais, fósseis, bandeiras, cantimploras e moedas
-- eventos: tempestade de areia e chuva de pedras
-- rodadas de 40 segundos e três poderes absurdos após cada rodada
+- funciona offline depois de instalado
+- orientação paisagem travada em celulares
+- tela cheia imersiva, incluindo barra de navegação
+- suporte a recortes, câmeras frontais e áreas seguras
+- controles grandes posicionados nas laterais para uso com os polegares
+- vibração nativa diferente para curva, vento e salto
+- tela mantida acordada durante a partida
+- retomada protegida ao voltar de outro aplicativo
+- botão Voltar pausa; apertar novamente em até 1,5 segundo fecha o jogo
+- ampliação pixel-perfect em múltiplos inteiros
+- ícone adaptativo e splash screen próprios
 
-## Controles
+## Construir o APK no GitHub
 
-- **Direcional / WASD:** orientar a prancha
-- **Shift / CURVA:** fazer curva fechada, perdendo velocidade
-- **Espaço / PULAR:** saltar na crista com embalo
-- **F / VENTO:** usar o impulso acumulado
-- **P / Esc:** pausar
+A workflow `.github/workflows/android-apk.yml` compila automaticamente a branch `android-duna-livre`.
 
-No celular, use os botões na tela.
+1. Abra a aba **Actions** do repositório.
+2. Escolha **Construir APK Duna Livre**.
+3. Abra a execução mais recente.
+4. Baixe o artefato **Duna-Livre-Android-APK**.
+5. Extraia o ZIP e instale `Duna-Livre-Android.apk` no celular.
 
-## Desenvolvimento
+O artefato também inclui um arquivo SHA-256 para verificar o download.
+
+## Desenvolvimento local
+
+Requisitos: Node.js 22+, Android Studio e Android SDK.
 
 ```bash
 npm install
-npm run dev
+npm run build
+npx cap add android
+npx cap sync android
+npx cap open android
 ```
+
+Para atualizar o conteúdo web depois que o projeto Android já existir:
 
 ```bash
-npm run build
+npm run android:sync
 ```
 
-Esta versão vive na branch `duna-livre`. O jogo aquático permanece no `main`.
+## Branches
+
+- `main`: Maré Limpa JP
+- `duna-livre`: versão web de areia
+- `android-duna-livre`: APK e experiência Android
